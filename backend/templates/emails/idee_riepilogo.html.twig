@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="it">
+<body style="font-family: Arial, sans-serif; color: #313a46; line-height: 1.5;">
+    <p>Ciao {{ nome }},</p>
+    <p>{% if totale == 1 %}nel portale delle idee è arrivata 1 nuova idea{% else %}nel portale delle idee sono arrivate {{ totale }} nuove idee{% endif %}:</p>
+    <ul>
+        <li>nuove funzionalità: <strong>{{ funzionalita }}</strong></li>
+        <li>miglioramenti: <strong>{{ miglioramenti }}</strong></li>
+    </ul>
+    <p>
+        <a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">Apri il portale delle idee</a>
+    </p>
+    <p style="font-size: 13px; color: #6c757d;">
+        Per riservatezza il testo delle idee si legge solo nel portale.
+    </p>
+</body>
+</html>

@@ -1,0 +1,19 @@
+framework:
+    rate_limiter:
+        # Endpoint pubblici non coperti da login_throttling (registrazione, inviti).
+        public_auth:
+            policy: sliding_window
+            limit: '%app.public_auth_limit%'
+            interval: '15 minutes'
+        # Codici errati della verifica in due passaggi, per utente (login e conferme
+        # da utente autenticato): con una sessione rubata non si provano codici a raffica.
+        second_factor:
+            policy: sliding_window
+            limit: '%app.second_factor_limit%'
+            interval: '15 minutes'
+        # Proposte di categoria con l'AI, per utente: il wizard ne chiede una per
+        # documento (al massimo 50 per giro). Il limite ferma solo chi le chiede a raffica.
+        proposta_categoria:
+            policy: sliding_window
+            limit: '%app.proposta_categoria_limit%'
+            interval: '1 hour'

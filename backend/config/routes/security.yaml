@@ -1,0 +1,12 @@
+# Rotte gestite dal firewall "api" (nessun controller dietro).
+api_login:
+    path: /api/auth/login
+    methods: [POST]
+
+api_token_refresh:
+    path: /api/auth/refresh
+    methods: [POST]
+
+api_logout:
+    path: /api/auth/logout
+    methods: [POST]

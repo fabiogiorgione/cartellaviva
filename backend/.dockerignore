@@ -1,0 +1,16 @@
+# Contesto della build dell'immagine (target prod copia tutto con "COPY . .").
+# Segreti e chiavi di QUESTA macchina: mai dentro un'immagine.
+.env.local
+.env.local.php
+.env.*.local
+config/jwt/*.pem
+config/secrets/prod/prod.decrypt.private.php
+
+# Si ricreano nella build (composer install, cache:clear, assets:install).
+vendor/
+var/
+public/bundles/
+
+# Solo sviluppo e test.
+.phpunit.cache/
+phpunit.xml

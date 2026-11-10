@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="it">
+<body style="font-family: Arial, sans-serif; color: #313a46; line-height: 1.5;">
+    <p>Ciao {{ nome }},</p>
+    <p>il team di CartellaViva ha creato un account per te{% if dove %} per <strong>{{ dove }}</strong>{% endif %}. Per iniziare scegli la tua password:</p>
+    <p>
+        <a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">Attiva il tuo account</a>
+    </p>
+    <p>Il link vale <strong>7 giorni</strong> e si può usare una volta sola. Se scade, puoi usare "Password dimenticata" dalla pagina di accesso con questo indirizzo email.</p>
+    <p style="font-size: 13px; color: #6c757d;">
+        Se non ti aspettavi questa email puoi ignorarla. Nessuno di CartellaViva ti chiederà mai la password o i codici.
+    </p>
+</body>
+</html>

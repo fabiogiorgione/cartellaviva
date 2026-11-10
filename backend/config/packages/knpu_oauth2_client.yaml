@@ -1,0 +1,13 @@
+# OAuth2 verso i provider delle sorgenti di import (KnpUOAuth2ClientBundle).
+# Credenziali SOLO da variabili d'ambiente: se mancano, creare una sorgente
+# google_drive risponde 422 "Provider non configurato" (nessun crash).
+# Il redirect effettivo è sempre GOOGLE_OAUTH_REDIRECT_URI (vedi KnpuGoogleOAuth).
+knpu_oauth2_client:
+    clients:
+        google_drive:
+            type: google
+            client_id: '%env(GOOGLE_OAUTH_CLIENT_ID)%'
+            client_secret: '%env(GOOGLE_OAUTH_CLIENT_SECRET)%'
+            redirect_route: api_import_source_callback
+            redirect_params: {}
+            access_type: offline

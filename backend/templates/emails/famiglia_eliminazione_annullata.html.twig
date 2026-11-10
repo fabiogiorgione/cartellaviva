@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="it">
+<body style="font-family: Arial, sans-serif; color: #313a46; line-height: 1.5;">
+    <p>Ciao {{ nome }},</p>
+    <p>{{ da }} ha annullato l'eliminazione {{ ente|default(false) ? 'dell\'ente' : 'della famiglia' }} <strong>{{ famiglia }}</strong>: tutto torna come prima.</p>
+    <p>Se usavate Google Drive, va ricollegato dalle impostazioni.</p>
+    <p>
+        <a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">{{ ente|default(false) ? 'Apri l\'area dell\'ente' : 'Apri le impostazioni della famiglia' }}</a>
+    </p>
+</body>
+</html>

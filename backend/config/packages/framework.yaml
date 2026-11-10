@@ -1,0 +1,26 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+
+    # Note that the session will be started ONLY if you read or write from it.
+    session: true
+
+    #esi: true
+    #fragments: true
+
+    http_client:
+        scoped_clients:
+            # API di Google Drive (sola lettura), usata da GoogleDriveProvider ($googleDriveClient).
+            google_drive.client:
+                base_uri: 'https://www.googleapis.com/drive/v3/'
+                timeout: 30
+                max_duration: 300
+
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file
+        http_client:
+            # Nessuna chiamata di rete nei test: Drive è simulato in memoria.
+            mock_response_factory: App\Tests\Support\FakeGoogleDrive

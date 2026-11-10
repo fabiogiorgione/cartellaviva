@@ -1,0 +1,10 @@
+# Contesto "frontend" della build di produzione (stage web del backend/Dockerfile).
+# Risultati di build e cache di questa macchina: si ricreano nell'immagine.
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+coverage/
+.idea/
+*.iml

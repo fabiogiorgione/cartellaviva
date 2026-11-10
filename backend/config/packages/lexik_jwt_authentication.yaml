@@ -1,0 +1,9 @@
+lexik_jwt_authentication:
+    secret_key: '%env(resolve:JWT_SECRET_KEY)%'
+    public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
+    pass_phrase: '%env(JWT_PASSPHRASE)%'
+    # Access token breve: i permessi non sono nel token (si leggono dal DB),
+    # la breve durata limita la finestra di un token rubato.
+    token_ttl: 900
+    user_id_claim: email
+    clock_skew: 30

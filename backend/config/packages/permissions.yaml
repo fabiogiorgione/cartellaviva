@@ -1,0 +1,31 @@
+# Catalogo permessi per risorse che non hanno (ancora) un'entità.
+#
+# Le risorse con entità dichiarano i propri permessi con l'attributo
+# App\Tenancy\Permission\Attribute\PermissionResource sulla classe; il catalogo finale
+# (parametro app.permission_catalog) è la fusione delle due fonti.
+#
+# Formato del codice: risorsa:azione[:scope]
+#   scope "own" -> solo sulle risorse di cui l'utente è proprietario (owner_user_id)
+#   scope "all" -> su tutte le risorse del tenant
+# Nei controlli si chiede sempre il permesso senza scope, es.
+#   is_granted('documento:write', $documento)
+# e il voter concede se il ruolo ha "documento:write:all" oppure
+# "documento:write:own" e l'utente è il proprietario del documento.
+#
+# Dopo ogni modifica: bin/console app:permissions:sync && bin/console app:roles:sync
+parameters:
+    app.permissions:
+        documento:
+            label: Documenti
+            # Non "sensitive" a livello di risorsa: le decisioni NEGATE finiscono sempre
+            # nell'audit, mentre letture/scritture dei documenti con categoria sensibile
+            # sono registrate esplicitamente da App\Documenti\DocumentAudit.
+            sensitive: false
+            actions:
+                read: Visualizza i documenti del tenant
+                create: Carica nuovi documenti
+                'write:own': Modifica i documenti caricati da sé
+                'write:all': Modifica qualsiasi documento del tenant
+                'delete:own': Elimina i documenti caricati da sé
+                'delete:all': Elimina qualsiasi documento del tenant
+        # "scadenza" ora è dichiarata sull'entità App\Scadenze\Entity\Scadenza.

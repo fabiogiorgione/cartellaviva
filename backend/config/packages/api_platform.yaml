@@ -1,0 +1,22 @@
+api_platform:
+    title: CartellaViva API
+    version: 0.1.0
+    mapping:
+        paths:
+            - '%kernel.project_dir%/src/Shared/ApiResource'
+            - '%kernel.project_dir%/src/Import/ApiResource'
+            - '%kernel.project_dir%/src/Scadenze/ApiResource'
+            - '%kernel.project_dir%/src/Documenti/ApiResource'
+            - '%kernel.project_dir%/src/Tenancy/ApiResource'
+    formats:
+        json: ['application/json']
+        jsonld: ['application/ld+json']
+    patch_formats:
+        json: ['application/merge-patch+json']
+    docs_formats:
+        jsonopenapi: ['application/vnd.openapi+json']
+        html: ['text/html']
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']

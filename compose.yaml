@@ -1,0 +1,132 @@
+# CartellaViva — ambiente di sviluppo (singola VM, Docker Compose).
+# Prima installazione: vedi README ("Avvio") e docs/gestione-chiavi.md (master key).
+# Avvio:   docker compose up -d --build
+# API:     http://localhost:8090/api/docs
+# Mailpit: http://localhost:8025
+name: cartellaviva
+
+x-backend: &backend
+  build:
+    context: ./backend
+    target: dev
+  user: "${UID:-1000}:${GID:-1000}"
+  environment:
+    DATABASE_URL: "postgresql://${POSTGRES_USER:-cartellaviva}:${POSTGRES_PASSWORD:-cartellaviva}@database:5432/${POSTGRES_DB:-cartellaviva}?serverVersion=16&charset=utf8"
+    MAILER_DSN: "smtp://mailer:1025"
+    FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5000}"
+    CORS_ALLOW_ORIGIN: "${CORS_ALLOW_ORIGIN:-^https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$}"
+    DOCUMENT_STORAGE_DIR: /var/lib/cartellaviva/documents
+    APP_MASTER_KEY_FILE: /run/secrets/master_key
+    GOTENBERG_URL: http://convertitore:3000
+  networks: [default, convertitore]
+  volumes:
+    - ./backend:/app
+    - document_storage:/var/lib/cartellaviva/documents
+  # I file caricati passano da /tmp (upload temporanei di PHP): in RAM, mai sul disco.
+  tmpfs:
+    - /tmp
+  secrets:
+    - master_key
+  depends_on:
+    database:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  php:
+    <<: *backend
+    ports:
+      - "${API_PORT:-8090}:8080"
+
+  # Consumer Messenger dedicato: lavori asincroni (OCR, import, classificazione) e
+  # attività pianificate (src/Schedule.php). Riavviato periodicamente per non
+  # accumulare memoria; stessa immagine e stesso secret dell'API.
+  worker:
+    <<: *backend
+    command: ["php", "-d", "memory_limit=512M", "bin/console", "messenger:consume", "async", "scheduler_default", "--time-limit=3600", "--memory-limit=256M", "-vv"]
+    # L'healthcheck dell'immagine controlla Caddy, che nel worker non gira (e pgrep non c'è).
+    healthcheck:
+      test: ["CMD", "grep", "-q", "messenger:consume", "/proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  database:
+    # postgres:16-alpine con l'estensione pgvector (ricerca per significato).
+    build: ./docker/database
+    image: cartellaviva-database:16-pgvector
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-cartellaviva}"
+      POSTGRES_USER: "${POSTGRES_USER:-cartellaviva}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-cartellaviva}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+    restart: unless-stopped
+
+  # Modello linguistico LOCALE per la classificazione dei documenti importati:
+  # il testo OCR (anche dei documenti sensibili) non esce mai dalla VM.
+  # Nessuna porta pubblicata: raggiungibile solo dalla rete interna (http://ollama:11434).
+  # Primo avvio: docker compose exec ollama ollama pull qwen3:4b-instruct-2507-q4_K_M
+  # (il modello si sceglie con OLLAMA_MODEL in backend/.env). Solo CPU: ~3-4 GB di RAM.
+  # Ricerca per significato: docker compose exec ollama ollama pull bge-m3 (OLLAMA_EMBED_MODEL, ~1,2 GB).
+  ollama:
+    image: ollama/ollama:0.40.15
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  # Conversione dei documenti Office (DOCX, XLSX, ODT...) in PDF per la SOLA scheda
+  # "Anteprima": l'originale resta com'è. Gotenberg (LibreOffice) in un container a
+  # parte, sulla rete "convertitore" senza accesso a internet, con i file temporanei
+  # in RAM (tmpfs): il documento decifrato non tocca mai il disco. Solo la route
+  # LibreOffice è attiva; nessuna porta pubblicata.
+  convertitore:
+    image: gotenberg/gotenberg:8.40.0
+    command:
+      - gotenberg
+      - --api-timeout=60s
+      - --api-disable-download-from
+      - --chromium-disable-routes
+      - --pdfengines-disable-routes
+      - --prometheus-disable-collect
+      - --libreoffice-restart-after=10
+      - --log-level=warn
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    networks: [convertitore]
+    restart: unless-stopped
+
+  mailer:
+    image: axllent/mailpit:v1.33.0
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    restart: unless-stopped
+
+networks:
+  default:
+  # Solo API e worker parlano con il convertitore; "internal" = nessuna uscita verso internet.
+  convertitore:
+    internal: true
+
+# Master key dei documenti sensibili: file FUORI dal repository e dal backup del DB.
+# Generazione e backup: docs/gestione-chiavi.md
+secrets:
+  master_key:
+    file: ${MASTER_KEY_FILE:-./secrets/master_key}
+
+volumes:
+  database_data:
+  # File dei documenti (quelli sensibili sono cifrati). Va salvato insieme al DB.
+  document_storage:
+  # Modelli scaricati da Ollama (riscaricabili: non serve il backup).
+  ollama_models:

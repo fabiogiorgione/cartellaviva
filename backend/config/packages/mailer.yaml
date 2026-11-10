@@ -1,0 +1,10 @@
+framework:
+    mailer:
+        dsn: '%env(MAILER_DSN)%'
+
+when@test:
+    framework:
+        mailer:
+            # I test leggono le email dal registro dei messaggi: non si spedisce nulla, nemmeno
+            # quando l'ambiente (docker compose) imposta MAILER_DSN verso Mailpit.
+            dsn: 'null://null'

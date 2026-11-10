@@ -1,0 +1,19 @@
+# Analisi statica del backend: docker compose exec php vendor/bin/phpstan
+# Le estensioni Symfony e Doctrine (installate da phpstan/extension-installer)
+# leggono il container compilato di dev e i metadati delle entità.
+parameters:
+    level: 5
+    paths:
+        - src
+    # La cache resta nella cartella temporanea del container (predefinita: /tmp/phpstan) e non
+    # in var/: su Docker Desktop per Mac, con la cache nella cartella condivisa con il PC, la
+    # prima analisi fallisce (i processi paralleli si contendono lo stesso file).
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
+
+# Segnalazioni presenti all'avvio dell'analisi (2026-10-09): si smaltiscono nella
+# fase 1 di correzione dei bug. Le nuove fanno fallire subito l'analisi.
+includes:
+    - phpstan-baseline.neon

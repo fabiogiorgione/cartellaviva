@@ -1,0 +1,21 @@
+# Storage dei documenti. Per ora adapter locale su un volume Docker dedicato;
+# passare a un object storage (S3/Azure Blob) richiede solo di cambiare
+# l'adapter qui: il codice usa l'interfaccia Flysystem (App\Documenti\DocumentStorage).
+flysystem:
+    storages:
+        documents.storage:
+            adapter: 'local'
+            options:
+                directory: '%env(resolve:DOCUMENT_STORAGE_DIR)%'
+                permissions:
+                    file: { public: 0o640, private: 0o600 }
+                    dir: { public: 0o750, private: 0o700 }
+            visibility: private
+            directory_visibility: private
+
+when@test:
+    flysystem:
+        storages:
+            # In memoria: i test non lasciano file e restano isolati.
+            documents.storage:
+                adapter: 'memory'

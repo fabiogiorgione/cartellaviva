@@ -1,0 +1,34 @@
+class RoutesName {
+  final login = '/auth/login';
+  final logOut = '/auth/log_out';
+  final lock = '/auth/lock';
+  final forgotPassword = '/auth/forgot_password';
+  final createAccount = '/auth/register_account';
+  final acceptInvite = '/auth/invite';
+  final twoFactor = '/auth/two-factor';
+  final tenantMembers = '/tenant/members';
+  final nuovoDocumento = '/documenti/nuovo';
+  final analisiDocumenti = '/documenti/analisi';
+  final benvenuto = '/benvenuto';
+  final scadenze = '/scadenze';
+  final documenti = '/documenti';
+  final categorie = '/categorie';
+  final famigliaImpostazioni = '/famiglia/impostazioni';
+  final importEsito = '/import/esito';
+  final richieste = '/richieste';
+  final richiesta = '/richieste/:id';
+  final invitoEnte = '/collegamenti/invito';
+  final enteRegistrazione = '/ente/registrazione';
+  final enteIscritti = '/ente/iscritti';
+  final enteGruppi = '/ente/gruppi';
+  final enteRichieste = '/ente/richieste';
+  final enteRichiestaNuova = '/ente/richieste/nuova';
+  final enteRichiesta = '/ente/richieste/:id';
+  final enteProfilo = '/ente/profilo';
+  final adminEnti = '/admin/enti';
+  final ente = '/ente';
+  final documento = '/documento/:id';
+  final accountProfile = '/account/profile';
+  final accountSecurity = '/account/security';
+  final dashboard = '/dashboard';
+}

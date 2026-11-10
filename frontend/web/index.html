@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="CartellaViva: i documenti di famiglia, al sicuro e sempre aggiornati.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="CartellaViva">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <meta name="theme-color" content="#0F5C4C">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>CartellaViva</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    const serviceWorkerVersion = {{flutter_service_worker_version}};
+  </script>
+  <!-- pdf.js locale per l'anteprima dei PDF (vedi web/pdfjs/README.md): prima dell'app. -->
+  <script src="pdfjs_config.js"></script>
+  <script src="flutter_bootstrap.js" async></script>
+  <style>
+    /* Caricamento iniziale: i colori e il simbolo di CartellaViva, finché Flutter non disegna. */
+    html, body { margin: 0; background: #EEF4F1; }
+    #loader {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+      background: #EEF4F1;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      color: #13241F;
+    }
+    #loader svg { width: 150px; height: 125px; animation: respiro 1.6s ease-in-out infinite; }
+    #loader .nome { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+    #loader .nome span { color: #0F5C4C; }
+    #loader .stato { font-size: 14px; color: #4A5A55; }
+    @keyframes respiro { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @media (prefers-reduced-motion: reduce) { #loader svg { animation: none; } }
+  </style>
+
+</head>
+<body>
+<div id="loader" role="status" aria-live="polite">
+  <svg viewBox="0 0 120 100" aria-hidden="true">
+    <path d="M8 26a6 6 0 0 1 6-6h24l8 8h60a6 6 0 0 1 6 6v54a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6z" fill="#0F5C4C"/>
+    <path d="M57 31c0-13 8-22 22-25c1 14-8 23-22 25z" fill="#F2B33D"/>
+    <path d="M57 31c-1-7-5-11-11-13" fill="none" stroke="#F2B33D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M8 44h104v44a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6z" fill="#3A9A7C"/>
+  </svg>
+  <div class="nome">Cartella<span>Viva</span></div>
+  <div class="stato">Caricamento…</div>
+</div>
+<script>
+  // Al primo frame dell'app il caricamento sparisce.
+  window.addEventListener('flutter-first-frame', function () {
+    var l = document.getElementById('loader');
+    if (l) l.remove();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# CartellaViva — server web di PRODUZIONE (FrankenPHP = Caddy + PHP).
+# Un solo dominio: l'app web su "/", l'API su "/api". HTTPS automatico con Let's Encrypt
+# per SERVER_NAME (il dominio): servono il DNS che punta al server e le porte 80 e 443 aperte.
+# I certificati stanno in /data/caddy (volume caddy_data): sopravvivono ai riavvii.
+
+{
+	skip_install_trust
+	# Indirizzo a cui Let's Encrypt scrive per i certificati in scadenza.
+	email {$ACME_EMAIL}
+
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp
+}
+
+{$SERVER_NAME} {
+	encode zstd br gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# SAMEORIGIN e non DENY: l'anteprima dei PDF (pdf.js) è una pagina dell'app in un iframe.
+		X-Frame-Options "SAMEORIGIN"
+		Permissions-Policy "geolocation=(), microphone=(), payment=()"
+		-Server
+	}
+
+	# API Symfony e risorse della sua documentazione (/api/docs usa /bundles).
+	@api path /api /api/* /bundles/*
+	handle @api {
+		root * /app/public
+		php_server
+	}
+
+	# App web (Flutter): file statici; ogni altro indirizzo è una pagina dell'app
+	# (/documenti, /auth/invite?token=...), quindi risponde index.html.
+	handle {
+		root * /srv/web
+		# I nomi dei file di Flutter non cambiano tra una versione e l'altra:
+		# il browser ricontrolla ogni volta (ETag), così dopo un aggiornamento non resta indietro.
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

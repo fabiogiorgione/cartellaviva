@@ -1,0 +1,146 @@
+# CartellaViva — PRODUZIONE su una VM (Docker Compose).
+# Installazione e aggiornamento: bash scripts/installa-server.sh (guida: docs/installazione-server.md).
+#
+# Valori e segreti vengono dal file .env accanto a questo file, generato dallo script sul
+# server e mai nel repository. Lo stesso .env contiene COMPOSE_FILE=compose.prod.yaml,
+# quindi nella cartella del progetto "docker compose ..." usa questo file.
+# Se un valore obbligatorio manca, compose si ferma con il messaggio indicato.
+name: cartellaviva
+
+x-env: &env
+  APP_SECRET: "${APP_SECRET:?manca APP_SECRET nel file .env}"
+  JWT_PASSPHRASE: "${JWT_PASSPHRASE:?manca JWT_PASSPHRASE nel file .env}"
+  APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY:?manca APP_ENCRYPTION_KEY nel file .env}"
+  DATABASE_URL: "postgresql://${POSTGRES_USER:-cartellaviva}:${POSTGRES_PASSWORD:?manca POSTGRES_PASSWORD nel file .env}@database:5432/${POSTGRES_DB:-cartellaviva}?serverVersion=16&charset=utf8"
+  MAILER_DSN: "${MAILER_DSN:?manca MAILER_DSN nel file .env (server SMTP)}"
+  MAILER_FROM: "${MAILER_FROM:?manca MAILER_FROM nel file .env}"
+  FRONTEND_URL: "https://${DOMINIO}"
+  DEFAULT_URI: "https://${DOMINIO}"
+  # App e API sullo stesso dominio: il CORS serve solo a eventuali altre origini.
+  CORS_ALLOW_ORIGIN: "${CORS_ALLOW_ORIGIN:?manca CORS_ALLOW_ORIGIN nel file .env}"
+  REGISTRAZIONE_APERTA: "${REGISTRAZIONE_APERTA:-0}"
+  GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
+  OLLAMA_URL: "${OLLAMA_URL:-http://ollama:11434}"
+  DOCUMENT_STORAGE_DIR: /var/lib/cartellaviva/documents
+  APP_MASTER_KEY_FILE: /run/secrets/master_key
+  GOTENBERG_URL: http://convertitore:3000
+
+x-backend: &backend
+  build:
+    context: ./backend
+    target: prod
+    additional_contexts:
+      frontend: ./frontend
+    args:
+      API_BASE_URL: "https://${DOMINIO:?manca DOMINIO nel file .env}/api"
+      GOOGLE_WEB_CLIENT_ID: "${GOOGLE_WEB_CLIENT_ID:-}"
+  image: cartellaviva-app:prod
+  # Lo stesso utente dell'immagine: proprietario di documenti, certificati e chiavi JWT.
+  user: "1000:1000"
+  environment: *env
+  networks: [default, convertitore]
+  volumes:
+    - document_storage:/var/lib/cartellaviva/documents
+    - jwt_keys:/app/config/jwt
+  # I file caricati passano da /tmp (upload temporanei di PHP): in RAM, mai sul disco.
+  tmpfs:
+    - /tmp
+  secrets:
+    - master_key
+  depends_on:
+    database:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # API e app web, con HTTPS (Let's Encrypt) sulle porte 80 e 443.
+  php:
+    <<: *backend
+    environment:
+      <<: *env
+      SERVER_NAME: "${DOMINIO}"
+      ACME_EMAIL: "${ACME_EMAIL:?manca ACME_EMAIL nel file .env}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - document_storage:/var/lib/cartellaviva/documents
+      - jwt_keys:/app/config/jwt
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Lavori asincroni (OCR, anteprime, AI) e attività pianificate (promemoria, pulizie).
+  worker:
+    <<: *backend
+    command: ["php", "-d", "memory_limit=512M", "bin/console", "messenger:consume", "async", "scheduler_default", "--time-limit=3600", "--memory-limit=256M", "-vv"]
+    # L'healthcheck dell'immagine controlla Caddy, che nel worker non gira.
+    healthcheck:
+      test: ["CMD", "grep", "-q", "messenger:consume", "/proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  database:
+    # postgres:16-alpine con l'estensione pgvector. Nessuna porta pubblicata.
+    build: ./docker/database
+    image: cartellaviva-database:16-pgvector
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-cartellaviva}"
+      POSTGRES_USER: "${POSTGRES_USER:-cartellaviva}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?manca POSTGRES_PASSWORD nel file .env}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+    restart: unless-stopped
+
+  # Modelli AI locali: il testo dei documenti non esce dal server. Nessuna porta pubblicata.
+  # Modelli: bash scripts/installa-server.sh --modelli (~3,7 GB, una volta sola).
+  ollama:
+    image: ollama/ollama:0.40.15
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  # Office -> PDF per le anteprime, su una rete senza accesso a internet, file temporanei in RAM.
+  convertitore:
+    image: gotenberg/gotenberg:8.40.0
+    command:
+      - gotenberg
+      - --api-timeout=60s
+      - --api-disable-download-from
+      - --chromium-disable-routes
+      - --pdfengines-disable-routes
+      - --prometheus-disable-collect
+      - --libreoffice-restart-after=10
+      - --log-level=warn
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    networks: [convertitore]
+    restart: unless-stopped
+
+networks:
+  default:
+  convertitore:
+    internal: true
+
+# Master key dei documenti sensibili: file FUORI dal repository e dal backup del DB.
+secrets:
+  master_key:
+    file: ${MASTER_KEY_FILE:-./secrets/master_key}
+
+volumes:
+  database_data:
+  document_storage:
+  ollama_models:
+  # Certificati Let's Encrypt e stato di Caddy: si conservano tra i riavvii.
+  caddy_data:
+  caddy_config:
+  # Chiavi JWT (generate al primo avvio): ricrearle chiude tutte le sessioni.
+  jwt_keys:

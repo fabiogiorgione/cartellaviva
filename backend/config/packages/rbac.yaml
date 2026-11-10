@@ -1,0 +1,84 @@
+# Ruoli e gruppi di permessi DI SISTEMA (tenant_id = NULL), sincronizzati da
+#   bin/console app:roles:sync
+# Sono disponibili in ogni tenant del tipo indicato e non sono modificabili via
+# API: un tenant che vuole varianti crea ruoli personalizzati propri.
+#
+# "*" nei permessi di un ruolo = tutti i codici del catalogo.
+parameters:
+    app.rbac.permission_groups:
+        documenti_lettura:
+            name: 'Documenti: lettura'
+            permissions: ['documento:read']
+        documenti_propri:
+            name: 'Documenti: gestione dei propri'
+            permissions: ['documento:create', 'documento:write:own', 'documento:delete:own']
+        documenti_tutti:
+            name: 'Documenti: gestione completa'
+            permissions: ['documento:create', 'documento:write:all', 'documento:delete:all']
+        condivisioni_proprie:
+            name: 'Condivisioni esterne: le proprie'
+            permissions: ['condivisione:manage:own']
+        scadenze_lettura:
+            name: 'Scadenze: lettura'
+            permissions: ['scadenza:read']
+        scadenze_proprie:
+            name: 'Scadenze: gestione delle proprie'
+            permissions: ['scadenza:manage:own']
+        membri_lettura:
+            name: 'Membri: elenco'
+            permissions: ['membro:read', 'tenant:read']
+        membri_gestione:
+            name: 'Membri: gestione'
+            permissions: ['membro:read', 'membro:invite', 'membro:manage_role', 'membro:remove']
+        famiglia_lettura:
+            name: 'Membri della famiglia: lettura'
+            permissions: ['membro_famiglia:read']
+        famiglia_gestione:
+            name: 'Membri della famiglia: gestione'
+            permissions: ['membro_famiglia:read', 'membro_famiglia:manage']
+        # Famiglia <-> enti
+        richieste_lettura:
+            name: 'Richieste degli enti: lettura'
+            permissions: ['richiesta:read', 'collegamento:read']
+        richieste_risposta:
+            name: 'Richieste degli enti: risposta e collegamenti'
+            permissions: ['richiesta:read', 'richiesta:respond', 'collegamento:read', 'collegamento:manage']
+        # Ente
+        ente_operatore:
+            name: 'Ente: operatore di gruppo'
+            permissions: ['ente:read', 'iscritto:read', 'iscritto:invite', 'richiesta_ente:read', 'richiesta_ente:send', 'richiesta_ente:verify', 'membro:read', 'tenant:read']
+        ente_segreteria:
+            name: 'Ente: segreteria'
+            permissions: ['ente:read', 'ente:manage', 'ente:tutti_i_gruppi', 'iscritto:read', 'iscritto:manage', 'iscritto:invite', 'richiesta_ente:read', 'richiesta_ente:send', 'richiesta_ente:verify', 'membro:read', 'membro:invite', 'membro:manage_role', 'membro:remove', 'tenant:read', 'audit:read']
+
+    app.rbac.roles:
+        owner:
+            name: Proprietario
+            description: Amministra il tenant, con tutti i permessi.
+            tenant_type: ~
+            permissions: ['*']
+        member:
+            name: Membro
+            description: Legge tutti i dati del tenant, modifica ed elimina solo quelli che ha caricato.
+            tenant_type: ~
+            permission_groups: [documenti_lettura, documenti_propri, condivisioni_proprie, scadenze_lettura, scadenze_proprie, membri_lettura, famiglia_gestione, richieste_risposta]
+        viewer:
+            name: Lettore
+            description: Sola lettura (es. un nonno che vede ma non modifica).
+            tenant_type: ~
+            permission_groups: [documenti_lettura, scadenze_lettura, membri_lettura, famiglia_lettura, richieste_lettura]
+        emergenza:
+            name: Contatto d'emergenza
+            description: 'Accesso in sola lettura concesso dopo l''attesa senza opposizione; si revoca in ogni momento.'
+            tenant_type: privato
+            permissions: ['documento:read', 'scadenza:read', 'membro_famiglia:read', 'tenant:read']
+        segreteria:
+            name: Segreteria
+            description: Gestisce iscritti, gruppi, operatori e richieste di tutto l'ente.
+            tenant_type: azienda
+            permission_groups: [ente_segreteria]
+        staff:
+            name: Operatore
+            description: 'Operatore di uno o più gruppi (classi, corsi): vede solo i suoi iscritti e le loro richieste.'
+            tenant_type: azienda
+            permission_groups: [ente_operatore]

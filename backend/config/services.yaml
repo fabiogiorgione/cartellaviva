@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+parameters:
+    app.frontend_url: '%env(FRONTEND_URL)%'
+    # Ritorno nell'app mobile dopo l'OAuth di Google Drive (deep link registrato dall'app).
+    app.mobile_return_url: '%env(MOBILE_RETURN_URL)%'
+    # Giorni prima che una famiglia di cui è chiesta la cancellazione venga eliminata.
+    app.tenant_deletion_grace_days: 30
+    app.mailer_from: '%env(MAILER_FROM)%'
+    app.invitation_ttl_hours: 72
+    app.login_max_attempts: 5
+    app.public_auth_limit: 20
+    # Codici errati della verifica in due passaggi per utente ogni 15 minuti.
+    app.second_factor_limit: 5
+    # Proposte di categoria con l'AI: per utente all'ora, e quante insieme su tutta la piattaforma.
+    app.proposta_categoria_limit: 150
+    app.proposte_contemporanee: 2
+    # Dimensione massima di un documento caricato (20 MB).
+    app.document_max_bytes: 20971520
+    # Caratteri di testo OCR inviati al classificatore (circa 2000 token).
+    app.classifier_max_chars: 6000
+    # Ricerca per significato (distanza coseno, 0 = uguali): un documento resta se non
+    # supera il tetto né la distanza del migliore più il margine. Tarati su bge-m3.
+    app.ricerca_distanza_max: 0.58
+    app.ricerca_margine: 0.1
+    # Documenti simili per contenuto: distanza massima tra le parti più vicine.
+    app.simili_distanza_max: 0.4
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            # Entità, risorse API, DTO ed enum non sono servizi (anche dentro i domini).
+            - '../src/*/Entity/'
+            - '../src/*/ApiResource/'
+            - '../src/*/Dto/'
+            - '../src/*/Enum/'
+            - '../src/Kernel.php'
+            - '../src/Tenancy/Permission/Attribute/'
+            - '../src/Tenancy/Permission/DependencyInjection/'
+
+    App\Account\Google\GoogleJwksProviderInterface: '@App\Account\Google\HttpGoogleJwksProvider'
+    App\Account\Push\PushGatewayInterface: '@App\Account\Push\FcmPushGateway'
+    App\Documenti\Anteprima\ConvertitorePdfInterface: '@App\Documenti\Anteprima\GotenbergConvertitore'
+
+when@test:
+    parameters:
+        app.login_max_attempts: 1000
+        app.public_auth_limit: 1000
+        app.proposta_categoria_limit: 4
+        # FakeEmbedder (parole in comune) ha distanze più alte di bge-m3; senza parole in comune vale 1.
+        app.ricerca_distanza_max: 0.9
+
+    services:
+        # Nei test gli ID token Google sono firmati con una chiave locale.
+        App\Account\Google\GoogleJwksProviderInterface:
+            class: App\Tests\Support\TestGoogleJwksProvider
+        # OAuth di Google finto; le chiamate a Drive passano dal MockHttpClient (FakeGoogleDrive).
+        App\Tests\Support\TestGoogleOAuth: ~
+        App\Import\Provider\GoogleDrive\GoogleOAuthInterface: '@App\Tests\Support\TestGoogleOAuth'
+        App\Tests\Support\FakeGoogleDrive: ~
+        App\Tests\Support\FakeClassifier: ~
+        App\Documenti\Classificazione\ClassifierInterface: '@App\Tests\Support\FakeClassifier'
+        # Embedding finti e deterministici (parole in comune = vettori vicini): nessun Ollama.
+        App\Tests\Support\FakeEmbedder:
+            public: true
+        # Sostituibile nei test (registrazione chiusa); il valore normale viene da REGISTRAZIONE_APERTA.
+        App\Account\Registrazione:
+            autowire: true
+            public: true
+        App\Documenti\Indice\EmbedderInterface: '@App\Tests\Support\FakeEmbedder'
+        # Push: nessuna chiamata a Firebase, gli invii si registrano in memoria.
+        App\Tests\Support\FakePushGateway:
+            public: true
+        App\Account\Push\PushGatewayInterface: '@App\Tests\Support\FakePushGateway'
+        # Anteprime: nessun Gotenberg, un PDF vero generato con dompdf.
+        App\Tests\Support\FakeConvertitore:
+            public: true
+        App\Documenti\Anteprima\ConvertitorePdfInterface: '@App\Tests\Support\FakeConvertitore'

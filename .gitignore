@@ -1,0 +1,13 @@
+# Master key e altri secret: MAI nel repository (vedi docs/gestione-chiavi.md)
+/secrets/
+# Backup della chiave esportati per errore nella cartella del progetto
+*.fvkey-backup
+
+# Impostazioni locali di Docker Compose (nomi di progetto, database, file della chiave)
+/.env
+
+# CI con GitHub Actions: resta fuori dal repository finché non è stata provata su GitHub
+/.github/workflows/ci.yml
+
+# Backup di database e documenti (scripts/backup.sh): restano sul server, mai nel repository
+/backups/

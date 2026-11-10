@@ -1,0 +1,13 @@
+nelmio_cors:
+    defaults:
+        origin_regex: true
+        allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']
+        allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        # X-Link-Sessione: sessione della risposta senza account (codice via email).
+        allow_headers: ['Content-Type', 'Authorization', 'X-Link-Sessione', 'X-Condivisione-Sessione']
+        # X-Total-Count: totale degli elenchi paginati (documenti).
+        # Retry-After: quanto aspettare dopo un 429 (il wizard delle proposte AI riprova da solo).
+        expose_headers: ['Link', 'X-Total-Count', 'Retry-After']
+        max_age: 3600
+    paths:
+        '^/': null

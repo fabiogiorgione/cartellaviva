@@ -1,0 +1,307 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Property App\\Account\\Entity\\Anagrafica\\Address\:\:\$anagrafica type mapping mismatch\: property can contain App\\Account\\Entity\\Anagrafica\\Anagrafica\|null but database expects App\\Account\\Entity\\Anagrafica\\Anagrafica\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Account/Entity/Anagrafica/Address.php
+
+		-
+			message: '#^Property App\\Account\\Entity\\Anagrafica\\Telefono\:\:\$anagrafica type mapping mismatch\: property can contain App\\Account\\Entity\\Anagrafica\\Anagrafica\|null but database expects App\\Account\\Entity\\Anagrafica\\Anagrafica\.$#'
+			identifier: doctrine.associationType
+			count: 1
+			path: src/Account/Entity/Anagrafica/Telefono.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Documenti/State/CategoriaProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Documenti\\ApiResource\\CategoriaResource and App\\Documenti\\ApiResource\\CategoriaResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Documenti/State/CategoriaProcessor.php
+
+		-
+			message: '#^Method App\\Documenti\\State\\CategoriaProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Documenti/State/CategoriaProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Documenti/State/DocumentoProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Documenti\\ApiResource\\DocumentoResource and App\\Documenti\\ApiResource\\DocumentoResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Documenti/State/DocumentoProcessor.php
+
+		-
+			message: '#^Method App\\Documenti\\State\\DocumentoProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Documenti/State/DocumentoProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Ente/AutomazioniEnte.php
+
+		-
+			message: '#^Instanceof between App\\Ente\\Entity\\ModelloRichiesta and App\\Ente\\Entity\\ModelloRichiesta will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Ente/AutomazioniEnte.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Import/State/ImportSourceProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Import\\ApiResource\\ImportSourceResource and App\\Import\\ApiResource\\ImportSourceResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Import/State/ImportSourceProcessor.php
+
+		-
+			message: '#^Method App\\Import\\State\\ImportSourceProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Import/State/ImportSourceProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Portale/Controller/PortaleEntiController.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\Entity\\Membership and App\\Tenancy\\Entity\\Membership will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Portale/Controller/PortaleEntiController.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Portale/GestioneManuale.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Portale/GestioneManuale.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Scadenze/State/ScadenzaProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Scadenze\\ApiResource\\ScadenzaResource and App\\Scadenze\\ApiResource\\ScadenzaResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Scadenze/State/ScadenzaProcessor.php
+
+		-
+			message: '#^Method App\\Scadenze\\State\\ScadenzaProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Scadenze/State/ScadenzaProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Shared/Command/CryptoKeyCommand.php
+
+		-
+			message: '#^Instanceof between App\\Ente\\Entity\\FileCifrato and App\\Ente\\Entity\\FileCifrato will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Shared/Command/CryptoKeyCommand.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\AuditLog\:\:\$action is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/AuditLog.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\AuditLog\:\:\$occurredAt is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/AuditLog.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\AuditLog\:\:\$outcome is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/AuditLog.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\CryptoKeyVersion\:\:\$createdAt is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/CryptoKeyVersion.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\CryptoKeyVersion\:\:\$fingerprint is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/CryptoKeyVersion.php
+
+		-
+			message: '#^Property App\\Shared\\Entity\\CryptoKeyVersion\:\:\$version is never written, only read\.$#'
+			identifier: property.onlyRead
+			count: 1
+			path: src/Shared/Entity/CryptoKeyVersion.php
+
+		-
+			message: '#^Property App\\Shared\\State\\AuditLogProvider\:\:\$audit is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Shared/State/AuditLogProvider.php
+
+		-
+			message: '#^Property App\\Tenancy\\Controller\\EmergenzaController\:\:\$tenants is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Tenancy/Controller/EmergenzaController.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Tenancy/EmergenzaService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Tenancy/Entity/Membership.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: src/Tenancy/Permission/DependencyInjection/PermissionCatalogPass.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Tenancy/State/InvitationProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\ApiResource\\InvitationResource and App\\Tenancy\\ApiResource\\InvitationResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Tenancy/State/InvitationProcessor.php
+
+		-
+			message: '#^Method App\\Tenancy\\State\\InvitationProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Tenancy/State/InvitationProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Tenancy/State/MemberProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\ApiResource\\MemberResource and App\\Tenancy\\ApiResource\\MemberResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Tenancy/State/MemberProcessor.php
+
+		-
+			message: '#^Method App\\Tenancy\\State\\MemberProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Tenancy/State/MemberProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Tenancy/State/MembroFamigliaProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\ApiResource\\MembroFamigliaResource and App\\Tenancy\\ApiResource\\MembroFamigliaResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Tenancy/State/MembroFamigliaProcessor.php
+
+		-
+			message: '#^Method App\\Tenancy\\State\\MembroFamigliaProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Tenancy/State/MembroFamigliaProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Tenancy/State/RoleProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\ApiResource\\RoleResource and App\\Tenancy\\ApiResource\\RoleResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Tenancy/State/RoleProcessor.php
+
+		-
+			message: '#^Method App\\Tenancy\\State\\RoleProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Tenancy/State/RoleProvider.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Tenancy/State/TenantProcessor.php
+
+		-
+			message: '#^Instanceof between App\\Tenancy\\ApiResource\\TenantResource and App\\Tenancy\\ApiResource\\TenantResource will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Tenancy/State/TenantProcessor.php
+
+		-
+			message: '#^Method App\\Tenancy\\State\\TenantProvider\:\:provide\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Tenancy/State/TenantProvider.php
+
+		-
+			message: '#^Anonymous function has an unused use \$tenant\.$#'
+			identifier: closure.unusedUse
+			count: 1
+			path: src/Tenancy/TenantDeletion.php
+
+		-
+			message: '#^Call to function assert\(\) with true will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Tenancy/TenantExporter.php
+
+		-
+			message: '#^Instanceof between App\\Documenti\\Entity\\Documento and App\\Documenti\\Entity\\Documento will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: src/Tenancy/TenantExporter.php

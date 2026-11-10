@@ -1,0 +1,84 @@
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+
+        # IMPORTANT: You MUST configure your server version,
+        # either here or in the DATABASE_URL env var (see .env file)
+        #server_version: '16'
+
+        profiling_collect_backtrace: '%kernel.debug%'
+        # Tabelle dell'indice dei documenti (tipo "vector" di pgvector): gestite con
+        # SQL diretto e dalla migration, mai dal confronto dello schema dell'ORM.
+        schema_filter: ~^(?!(public\.)?documento_(indice|embedding)$)~
+    orm:
+        validate_xml_mapping: true
+        naming_strategy: doctrine.orm.naming_strategy.underscore
+        identity_generation_preferences:
+            Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
+        auto_mapping: true
+        mappings:
+            # Struttura per dominio: le entità di ogni dominio in src/<Dominio>/Entity.
+            Account:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Account/Entity'
+                prefix: 'App\Account\Entity'
+            Shared:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Shared/Entity'
+                prefix: 'App\Shared\Entity'
+            Ente:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Ente/Entity'
+                prefix: 'App\Ente\Entity'
+            Portale:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Portale/Entity'
+                prefix: 'App\Portale\Entity'
+            Import:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Import/Entity'
+                prefix: 'App\Import\Entity'
+            Scadenze:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Scadenze/Entity'
+                prefix: 'App\Scadenze\Entity'
+            Documenti:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Documenti/Entity'
+                prefix: 'App\Documenti\Entity'
+            Tenancy:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Tenancy/Entity'
+                prefix: 'App\Tenancy\Entity'
+
+when@test:
+    doctrine:
+        dbal:
+            # "TEST_TOKEN" is typically set by ParaTest
+            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+
+when@prod:
+    doctrine:
+        orm:
+            query_cache_driver:
+                type: pool
+                pool: doctrine.system_cache_pool
+            result_cache_driver:
+                type: pool
+                pool: doctrine.result_cache_pool
+
+    framework:
+        cache:
+            pools:
+                doctrine.result_cache_pool:
+                    adapter: cache.app
+                doctrine.system_cache_pool:
+                    adapter: cache.system

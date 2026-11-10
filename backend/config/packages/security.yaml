@@ -1,0 +1,78 @@
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    providers:
+        # Senza "property": usa UserRepository::loadUserByIdentifier (email normalizzata).
+        app_user_provider:
+            entity:
+                class: App\Account\Entity\User
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+
+        # Tutta l'API è stateless: identità dal JWT, permessi dal DB a ogni richiesta.
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: app_user_provider
+            user_checker: App\Account\Security\UserChecker
+            # Richiesta anonima su rotta protetta -> 401 JSON (non redirect).
+            entry_point: jwt
+            json_login:
+                check_path: api_login
+                username_path: email
+                password_path: password
+                # Emette i token solo se la 2FA non è attiva, altrimenti una challenge.
+                success_handler: App\Account\Security\PasswordLoginSuccessHandler
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            login_throttling:
+                max_attempts: '%app.login_max_attempts%'
+                interval: '15 minutes'
+            jwt: ~
+            refresh_jwt:
+                check_path: api_token_refresh
+                invalidate_token_on_logout: true
+            logout:
+                path: api_logout
+
+        main:
+            lazy: true
+            provider: app_user_provider
+
+    access_control:
+        - { path: ^/api/auth/(login|refresh|register|registrazione|google|2fa)$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/invitations/(preview|accept)$, roles: PUBLIC_ACCESS }
+        # Ritorno da Google: nessun JWT, vale solo con lo state monouso (ImportSourceService).
+        - { path: ^/api/import-sources/oauth/callback$, roles: PUBLIC_ACCESS }
+        # Invito di un ente: anteprima e rifiuto/"non sono io" anche senza account (il token fa da credenziale).
+        - { path: ^/api/collegamenti/(anteprima|rifiuta)$, roles: PUBLIC_ACCESS }
+        # Risposta senza account: link + codice email (tranne "collega", che richiede l'account).
+        - { path: ^/api/link/[A-Za-z0-9_-]+/collega$, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/link/[A-Za-z0-9_-]+(/(codice|verifica|richiesta|allegato|risposta|rifiuta|firma|firma/codice))?$, roles: PUBLIC_ACCESS }
+        # Verifica pubblica di un'attestazione di firma con codice.
+        - { path: ^/api/verifica-firma/[A-Za-z0-9]+$, roles: PUBLIC_ACCESS }
+        # Recupero della 2FA (richiesta e conferma) e annullamento dal link dell'avviso.
+        - { path: ^/api/auth/recupero(/conferma)?$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/(password/(dimenticata|anteprima|reimposta)|attivazione(/anteprima)?|verifica-email|cambio-email/conferma)$, roles: PUBLIC_ACCESS }
+        # Accesso d'emergenza: anteprima dell'invito e opposizione dal link dell'email.
+        - { path: ^/api/emergenza/(invito|annulla)$, roles: PUBLIC_ACCESS }
+        # Condivisione esterna: il link (token) più il codice comunicato a parte.
+        - { path: ^/api/condivisioni/[A-Za-z0-9_-]+(/accedi|/documenti/[0-9a-fA-F-]+/file)?$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/procedure/annulla$, roles: PUBLIC_ACCESS }
+        # Download dell'esportazione: il token monouso (24 ore) fa da credenziale.
+        - { path: ^/api/esportazioni/[A-Za-z0-9_-]+$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/docs, roles: PUBLIC_ACCESS }
+        - { path: ^/api$, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+
+when@test:
+    security:
+        password_hashers:
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: auto
+                cost: 4
+                time_cost: 3
+                memory_cost: 10

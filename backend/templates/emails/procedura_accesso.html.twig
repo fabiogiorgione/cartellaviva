@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="it">
+<body style="font-family: Arial, sans-serif; color: #313a46; line-height: 1.5;">
+    <p>Ciao {{ nome }},</p>
+    {% if caso == 'conferma' %}
+        <p>abbiamo ricevuto una richiesta di recupero dell'accesso al tuo account CartellaViva (verifica in due passaggi persa).</p>
+        <p>Se l'hai chiesta tu, confermala da questo link (vale 24 ore). Poi il supporto ti contatterà per verificare la tua identità.</p>
+        <p><a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">Confermo la richiesta</a></p>
+        <p style="font-size: 13px; color: #6c757d;">Se non l'hai chiesta, ignora questa email: senza conferma non succede nulla.</p>
+    {% elseif caso == 'attesa' %}
+        {% if tipo == 'recupero_2fa' %}
+            <p>il supporto ha verificato l'identità di <strong>{{ interessato }}</strong>, che ha perso l'accesso con la verifica in due passaggi.</p>
+            <p>Il <strong>{{ quando|date('d/m/Y \\a\\l\\l\\e H:i') }}</strong> la verifica in due passaggi del suo account verrà disattivata e dovrà impostarla di nuovo.</p>
+        {% else %}
+            <p>la famiglia <strong>{{ famiglia }}</strong> è rimasta senza proprietario. Il supporto ha verificato l'identità di <strong>{{ interessato }}</strong>, che il <strong>{{ quando|date('d/m/Y \\a\\l\\l\\e H:i') }}</strong> diventerà proprietario.</p>
+        {% endif %}
+        <p>Se non te lo aspettavi o non sei d'accordo, annulla subito:</p>
+        <p><a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #dc2626; color: #fff; text-decoration: none; border-radius: 4px;">Non sono d'accordo: annulla</a></p>
+        <p style="font-size: 13px; color: #6c757d;">Il supporto non ti chiederà mai password o codici.</p>
+    {% elseif caso == 'respinta' %}
+        <p>la richiesta di recupero dell'accesso non è stata accolta{% if nota %}: {{ nota }}{% else %}.{% endif %}</p>
+    {% elseif caso == 'completata_recupero' %}
+        <p>la verifica in due passaggi del tuo account è stata disattivata e tutte le sessioni sono state chiuse.</p>
+        <p>Accedi con email e password: ti chiederemo subito di impostarla di nuovo.</p>
+        <p><a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">Accedi</a></p>
+    {% elseif caso == 'completata_proprietario' %}
+        <p>ora sei proprietario della famiglia <strong>{{ famiglia }}</strong>. Ti consigliamo di aggiungere un secondo proprietario.</p>
+        <p><a href="{{ url }}" style="display: inline-block; padding: 10px 18px; background: #0F5C4C; color: #fff; text-decoration: none; border-radius: 4px;">Apri le impostazioni</a></p>
+    {% endif %}
+</body>
+</html>

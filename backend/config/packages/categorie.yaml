@@ -1,0 +1,24 @@
+# Categorie di SISTEMA (tenant_id = NULL), condivise da tutti i tenant e
+# sincronizzate da:  bin/console app:categorie:sync
+# Non modificabili via API; ogni tenant può aggiungere categorie proprie.
+#
+# sensibile: true -> i documenti caricati in questa categoria (file e testo OCR)
+# vengono cifrati lato applicazione. Cambiare questo valore NON riscrive i
+# documenti già caricati.
+# icona: nome di un'icona Lucide (https://lucide.dev), colore: #RRGGBB.
+parameters:
+    app.categorie_sistema:
+        bollette:           { nome: Bollette,             icona: receipt,       colore: '#f59e0b', sensibile: false }
+        documenti_identita: { nome: Documenti Identità,   icona: id-card,       colore: '#6366f1', sensibile: true }
+        salute:             { nome: Salute,               icona: heart-pulse,   colore: '#ef4444', sensibile: true }
+        farmaci:            { nome: Farmaci,              icona: pill,          colore: '#ec4899', sensibile: true }
+        veicoli:            { nome: Veicoli,              icona: car,           colore: '#0ea5e9', sensibile: false }
+        casa:               { nome: Casa,                 icona: house,         colore: '#22c55e', sensibile: false }
+        scuola:             { nome: Scuola,               icona: graduation-cap, colore: '#a855f7', sensibile: false }
+        # Documenti importati (Google Drive) in attesa di classificazione. Sensibile per
+        # prudenza: finché il contenuto non è noto il documento si cifra. Se poi viene
+        # classificato in una categoria non sensibile resta comunque cifrato.
+        da_categorizzare:   { nome: Da categorizzare,     icona: inbox,         colore: '#64748b', sensibile: true }
+        # Copie consegnate agli enti collegati (firme, documenti inviati): la famiglia
+        # conserva sempre la sua copia, anche se interrompe il collegamento.
+        condivisi_enti:     { nome: Condivisi con enti,   icona: building,      colore: '#0d9488', sensibile: true }

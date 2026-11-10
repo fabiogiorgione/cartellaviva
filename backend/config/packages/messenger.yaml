@@ -1,0 +1,31 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # Coda su PostgreSQL (tabella messenger_messages): nessuna infrastruttura
+            # aggiuntiva. Consumata dal servizio "worker" del docker-compose.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 2
+                    delay: 5000
+                    multiplier: 3
+            failed: 'doctrine://default?queue_name=failed'
+
+        routing:
+            'App\Documenti\Message\OcrDocumentoMessage': async
+            'App\Documenti\Message\AnteprimaDocumentoMessage': async
+            'App\Import\Message\ImportJobMessage': async
+            # Se Ollama non risponde il messaggio viene ritentato (retry_strategy) e poi finisce in "failed".
+            'App\Documenti\Message\ClassificaDocumentoMessage': async
+            'App\Scadenze\Message\ProponiScadenzaMessage': async
+            'App\Documenti\Message\IndicizzaDocumentoMessage': async
+            'App\Account\Message\InviaPushMessage': async
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                # I test verificano l'invio del messaggio e invocano l'handler direttamente.
+                async: 'in-memory://'

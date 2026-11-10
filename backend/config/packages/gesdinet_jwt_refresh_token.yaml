@@ -1,0 +1,16 @@
+gesdinet_jwt_refresh_token:
+    refresh_token_class: App\Account\Entity\RefreshToken
+    # 30 giorni; ogni refresh consuma il token e ne emette uno nuovo (rotazione).
+    ttl: 2592000
+    single_use: true
+    # Il nuovo token eredita la scadenza del precedente: non si rinnova all'infinito.
+    single_use_ttl_update: false
+    # A DB solo l'hash: una copia del database non permette di fare refresh.
+    hash_tokens:
+        enabled: true
+        accept_stored_in_the_clear: false
+    # Limite di dispositivi con sessione attiva per utente.
+    max_tokens_per_user: 10
+    return_expiration: true
+    api_platform:
+        enabled: true
