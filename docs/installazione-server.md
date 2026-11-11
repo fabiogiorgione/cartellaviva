@@ -95,6 +95,26 @@ Se non hai creato il superadmin durante l'installazione:
 docker compose exec php php bin/console app:user:create-superadmin tua@email.it
 ```
 
+## 6 bis. Import da Google Drive (facoltativo)
+
+Serve solo se le famiglie vogliono importare documenti da una cartella di Google Drive. Senza, l'app funziona e l'import da Drive risponde "provider non configurato".
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) crea un progetto e abilita la **Google Drive API**.
+2. Configura la **schermata di consenso OAuth**: tipo **Esterno**, scope `.../auth/drive.readonly`, e aggiungi come **utenti di test** gli account Google di chi importerà.
+3. Crea le credenziali: **ID client OAuth** di tipo **Applicazione web**, con URI di reindirizzamento autorizzato `https://<dominio>/api/import-sources/oauth/callback`.
+4. Sul server, nel file `.env`, aggiungi:
+   ```
+   GOOGLE_OAUTH_CLIENT_ID=...apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=...
+   ```
+   poi `docker compose up -d`. L'URI di reindirizzamento lo ricava `compose.prod.yaml` dal dominio.
+
+`drive.readonly` per Google è uno scope *restricted*. Finché l'app resta "in test":
+- possono collegarsi solo gli utenti di test dichiarati (al massimo 100);
+- Google fa scadere il collegamento dopo 7 giorni: per sincronizzare di nuovo bisogna ricollegare la cartella.
+
+Per aprirla a tutti servono la verifica di Google e un audit di sicurezza annuale (CASA).
+
 ## 7. Backup periodici
 
 ```bash

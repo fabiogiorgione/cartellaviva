@@ -20,6 +20,10 @@ x-env: &env
   CORS_ALLOW_ORIGIN: "${CORS_ALLOW_ORIGIN:?manca CORS_ALLOW_ORIGIN nel file .env}"
   REGISTRAZIONE_APERTA: "${REGISTRAZIONE_APERTA:-0}"
   GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
+  # Import da Google Drive (facoltativo): vuoti = import da Drive non disponibile.
+  GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID:-}"
+  GOOGLE_OAUTH_CLIENT_SECRET: "${GOOGLE_OAUTH_CLIENT_SECRET:-}"
+  GOOGLE_OAUTH_REDIRECT_URI: "https://${DOMINIO}/api/import-sources/oauth/callback"
   OLLAMA_URL: "${OLLAMA_URL:-http://ollama:11434}"
   DOCUMENT_STORAGE_DIR: /var/lib/cartellaviva/documents
   APP_MASTER_KEY_FILE: /run/secrets/master_key
