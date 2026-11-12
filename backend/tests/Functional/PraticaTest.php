@@ -20,6 +20,8 @@ use App\Tenancy\Entity\Role;
 use App\Tenancy\Entity\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
@@ -351,6 +353,47 @@ final class PraticaTest extends ApiTestCase
         $this->assertStatus(409);
         $this->request('PATCH', $this->url("/pratiche/{$r['id']}"), ['analisiSu' => 'luna'], $this->token);
         $this->assertStatus(422);
+    }
+
+    public function testEvaluationAndAnonymizedExportFromReviewedPratica(): void
+    {
+        $scontrino = $this->documento('casa', 'scontrino.png', self::SCONTRINO."\nCliente Mario Rossi", '2025-03-12');
+        $visita = $this->documento('casa', 'visita.png', self::VISITA, '2025-06-05');
+        $p = $this->avvia([$this->id($this->mario)]);
+        $this->esegui($p['id']);
+        foreach ($this->dettaglio($p['id'])['voci'] as $v) {
+            $azione = $v['documento']['id'] === $scontrino ? 'conferma' : 'escludi';
+            $this->request('POST', $this->url("/pratiche/{$p['id']}/voci/{$v['id']}/$azione"), token: $this->token);
+            $this->assertStatus(200);
+        }
+        $app = new Application(static::$kernel);
+
+        $valuta = new CommandTester($app->find('app:pratiche:valuta'));
+        $valuta->execute(['--pratica' => [$p['id']]]);
+        $out = $valuta->getDisplay();
+        self::assertSame(0, $valuta->getStatusCode(), $out);
+        self::assertStringContainsString('Analisi su 2 documenti', $out);
+        self::assertMatchesRegularExpression('/spesa_sanitaria\s+1\s+2\s+1\s+1\s+0\s+50%\s+100%/', $out);
+
+        $file = tempnam(sys_get_temp_dir(), 'esempi');
+        $esporta = new CommandTester($app->find('app:pratiche:esporta-esempi'));
+        $esporta->execute(['--pratica' => [$p['id']], '--uscita' => $file]);
+        self::assertSame(0, $esporta->getStatusCode(), $esporta->getDisplay());
+        $righe = array_map(static fn ($r) => json_decode($r, true), array_filter(explode("\n", (string) file_get_contents($file))));
+        unlink($file);
+        self::assertCount(2, $righe);
+        $tutto = json_encode($righe, \JSON_UNESCAPED_UNICODE);
+        foreach (['Mario', 'Rossi', 'scontrino.png', '14,40'] as $vero) {
+            self::assertStringNotContainsString($vero, $tutto, $vero);
+        }
+        $positivo = array_values(array_filter($righe, static fn ($r) => str_contains($r['messages'][2]['content'], 'spesa_sanitaria')))[0];
+        self::assertSame(['system', 'user', 'assistant'], array_column($positivo['messages'], 'role'));
+        $risposta = json_decode($positivo['messages'][2]['content'], true)['voci'][0];
+        // L'importo della risposta è quello (finto) scritto nel testo, la data come nel testo.
+        self::assertStringContainsString($risposta['importo'], $positivo['messages'][1]['content']);
+        self::assertSame(['spesa_sanitaria', 'farmaci', '12/03/2025'], [$risposta['requisito'], $risposta['tipo'], $risposta['data']]);
+        $negativo = array_values(array_filter($righe, static fn ($r) => !str_contains($r['messages'][2]['content'], 'spesa_sanitaria')))[0];
+        self::assertSame('{"voci":[]}', $negativo['messages'][2]['content']);
     }
 
     private function avvia(array $persone = []): array

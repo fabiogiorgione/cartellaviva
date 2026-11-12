@@ -200,6 +200,25 @@ Provato con i dati di sviluppo: 4 documenti analizzati (polizza auto, visura, ve
 
 **Provato** sul simulatore iPhone 17 (iOS 27.2, Apple Intelligence del Mac, contesto 8.192 token), sui 9 documenti del 730/2025 dei dati di prova: 40 secondi in tutto (Ollama qwen3 4B sul server: circa 3 minuti). Trovato il bonifico della ristrutturazione (stesso importo e data di Ollama; come emittente la banca che ordina invece della ditta); non trovata la quietanza dell'assicurazione (Ollama sì); nessun falso "interessi del mutuo" (Ollama aveva preso il capitale estinto). Dopo il consenso, il referto cifrato in Salute è stato letto sul telefono: nessuna voce, giusto. Da provare su un iPhone vero.
 
+### Misurare e allenare l'analisi dei documenti (12/11/2026)
+
+Due comandi da console sul server, per le pratiche **già riviste** (proposte confermate, corrette o escluse nell'app):
+
+- `bin/console app:pratiche:valuta --pratica=<id> [--tenant=<id>] [--negativi] [--limite=N] [--json=file]` rilancia l'analisi (Ollama, o le regole se l'AI è spenta) su ogni documento e la confronta con le voci confermate. Dà, per requisito, le voci giuste, proposte, indovinate, in più e mancate, con precisione e richiamo; per campo quante volte il valore coincide; e le voci giuste che l'analisi non poteva trovare perché mancano parole chiave o categoria nelle regole. Non salva nulla. Con Ollama sul server ogni documento richiede da qualche secondo a un minuto (nei dati di prova: 2 minuti e 41 secondi per 10 documenti).
+- `bin/console app:pratiche:esporta-esempi --pratica=<id> [--tenant=<id>] --uscita=<file.jsonl> [--negativi] [--in-chiaro]` scrive gli esempi per allenare il modello (LoRA) nel formato chat (`{"messages": [system, user, assistant]}`, quello di `mlx-lm`): lo stesso prompt dell'analisi e la risposta giusta, con importi e date come sono scritti nel testo. Il file nasce con permessi 600 e resta sul server.
+
+Quali documenti (`EsempiPratica`): con voci confermate (positivi); con proposte tutte escluse ("qui non c'è nulla"); con `--negativi` anche quelli analizzati senza proposte (attenzione: una voce mancata aggiunta a mano senza documento li fa sembrare negativi). Si saltano quelli con proposte ancora da vedere.
+
+**Anonimizzazione** (`Anonimizzatore`, predefinita; `--in-chiaro` solo per prove e chiede conferma): stesse sostituzioni nel testo e nella risposta, con valori finti dello stesso formato. Si sostituiscono:
+- nomi e cognomi delle persone della pratica, degli utenti della famiglia, degli intestatari riconosciuti dall'indice e di chi segue etichette come Intestatario, Sig., Nominativo, Cognome e nome, Beneficiario, Ordinante, Dichiarante, Paziente;
+- codici fiscali, IBAN (finti ma con il controllo valido), targhe, email, telefoni, numeri di 8 cifre o più;
+- importi, moltiplicati per un fattore casuale (stesso ordine di grandezza);
+- nome del file.
+
+Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, prima delle etichette restavano i nomi veri delle persone scritti nei documenti; ora no. Non è perfetto (un indirizzo resta): il file va guardato prima di farlo uscire dal server. Lo strato LoRA allenato sui dati veri sarebbe a sua volta un dato personale; allenato sugli esempi anonimizzati no.
+
+**Regole ISEE per gli anni passati**: `isee-2024.yaml` (dati 2022) e `isee-2025.yaml` (dati 2023), provvisorie (stesse regole della DSU 2026), per ricostruire gli anni passati come banco di prova.
+
 ### Modello 730
 
 Anno: **spese dell'anno d'imposta** (730 presentato l'anno dopo). Requisiti, per persona:

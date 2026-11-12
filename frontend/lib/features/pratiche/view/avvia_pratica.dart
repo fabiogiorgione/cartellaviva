@@ -31,12 +31,19 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
   var scelto = liberi.where((m) => m.proposto).firstOrNull ?? liberi.firstOrNull;
   final selezionate = <String>{if (persone.length == 1) persone.first.id};
   var invio = false;
+  // Contenuto e pulsante in fondo sono due builder separati: ogni scelta li ridisegna entrambi.
+  final cambi = ValueNotifier(0);
+  void cambia(VoidCallback f) {
+    f();
+    cambi.value++;
+  }
 
   await apriFoglio<void>(
     context,
     titolo: 'Avvia una pratica',
-    contenuto: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
+    contenuto: (ctx) => ListenableBuilder(
+      listenable: cambi,
+      builder: (ctx, _) {
         if (liberi.isEmpty) {
           return const Padding(padding: EdgeInsets.all(20), child: Testo.bodyMedium('Hai già una pratica per ogni anno disponibile.'));
         }
@@ -59,7 +66,7 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
             const Testo.titleSmall('Quale pratica', fontWeight: FontWeight.w600),
             RadioGroup<ModelloPratica>(
               groupValue: scelto,
-              onChanged: (m) => setState(() => scelto = m),
+              onChanged: (m) => cambia(() => scelto = m),
               child: Column(children: [
                 for (final m in liberi)
                   RadioListTile<ModelloPratica>(
@@ -84,7 +91,7 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
                 value: selezionate.contains(p.id),
                 title: Text(p.nome),
                 subtitle: p.relazione == null ? null : Text(p.relazione!),
-                onChanged: (v) => setState(() => v == true ? selezionate.add(p.id) : selezionate.remove(p.id)),
+                onChanged: (v) => cambia(() => v == true ? selezionate.add(p.id) : selezionate.remove(p.id)),
               ),
             if (telefono)
               const Padding(
@@ -95,18 +102,19 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
         );
       },
     ),
-    azione: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => FilledButton(
+    azione: (ctx) => ListenableBuilder(
+      listenable: cambi,
+      builder: (ctx, _) => FilledButton(
         onPressed: invio || scelto == null || selezionate.isEmpty
             ? null
             : () async {
-                setState(() => invio = true);
+                cambia(() => invio = true);
                 try {
                   final p = await PraticheApi.avvia(tenantId, modello: scelto!.modello, anno: scelto!.anno, persone: selezionate.toList(), analisiSu: telefono ? 'telefono' : 'server');
                   if (ctx.mounted) Navigator.pop(ctx);
                   Get.toNamed('/pratiche/pratica', parameters: {'id': p.id});
                 } on ApiException catch (e) {
-                  setState(() => invio = false);
+                  cambia(() => invio = false);
                   if (ctx.mounted) mostraMessaggio(ctx, e.message, errore: true);
                 }
               },
@@ -114,4 +122,5 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
       ),
     ),
   );
+  cambi.dispose();
 }

@@ -1,0 +1,182 @@
+# Modello di pratica: ISEE per la DSU del 2025 (redditi e patrimonio del 2023).
+#
+# PROVVISORIO: stesse regole della DSU 2026. Le basi (dati del secondo anno
+# precedente, saldo e giacenza media, validità al 31 dicembre) valgono dal 2020;
+# le istruzioni INPS di quell'anno non sono state ricontrollate. Serve soprattutto
+# a ricostruire gli anni passati (banco di prova per l'analisi dei documenti).
+#
+# L'app NON calcola l'indicatore: raccoglie i documenti per persona del
+# nucleo, li controlla e prepara il pacchetto per il CAF o per controllare la
+# DSU precompilata. Lo verifica ogni anno chi mantiene il progetto, sulle
+# istruzioni INPS, prima di attivarlo: scrivere la data in "verificato".
+# Formato: vedi docs/pratiche.md, "Il motore comune".
+modello: isee
+anno: 2025
+riferimento: -2
+titolo: 'ISEE 2025 · redditi e patrimonio 2023'
+descrizione: 'I documenti per la DSU del 2025: redditi e patrimonio del 2023 di ogni persona del nucleo.'
+verificato: ~
+fonti:
+    - titolo: 'INPS, Istruzioni per la compilazione della DSU'
+      url: 'https://servizi2.inps.it/servizi/Iseeriforma/docs/info/Modulistica/Istruzioni%20alla%20compilazione%20anno%202021.pdf'
+    - titolo: 'INPS, Portale unico ISEE'
+      url: 'https://www.inps.it/it/it/dettaglio-scheda.it.schede-servizio-strumento.schede-servizi.Portale-unico-ISEE.html'
+    - titolo: 'INPS, ISEE precompilato: acquisizione della DSU precompilata'
+      url: 'https://servizi2.inps.it/servizi/iseeprecompilato/docs/info/Guide/ISEEPrecompilato_Tutorial_Parte3.pdf'
+note: >-
+    Redditi e patrimonio sono quelli del secondo anno prima della DSU; per ogni
+    conto servono il saldo al 31 dicembre e la giacenza media annua. L'ISEE vale
+    fino al 31 dicembre dell'anno in cui si presenta la DSU. Dal 1° aprile, con
+    variazioni rilevanti, si può chiedere l'ISEE corrente.
+rinnovo: { titolo: 'Rinnovare l''ISEE', giorni: 30 }
+
+requisiti:
+    documento_identita:
+        etichetta: 'Documento e codice fiscale'
+        descrizione: 'Un documento d''identità valido e la tessera sanitaria (codice fiscale) di ogni persona del nucleo.'
+        per: persona
+        obbligatorio: true
+        somma: false
+        data: libera
+        riconosci:
+            categorie: [documenti_identita]
+            parole: ['carta d''identità', 'carta di identità', 'passaporto', 'tessera sanitaria', 'patente di guida']
+        tipi:
+            carta_identita: { etichetta: 'Carta d''identità', parole: ['carta d''identità', 'carta di identità'] }
+            passaporto: { etichetta: 'Passaporto', parole: ['passaporto'] }
+            patente: { etichetta: 'Patente', parole: ['patente'] }
+            tessera_sanitaria: { etichetta: 'Tessera sanitaria', parole: ['tessera sanitaria'] }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Documento' }
+            data: { tipo: data, etichetta: 'Scadenza' }
+
+    redditi:
+        etichetta: 'Redditi'
+        descrizione: 'CU, 730 o Redditi PF con i redditi dell''anno di riferimento.'
+        per: persona
+        obbligatorio: true
+        somma: false
+        data: dopo
+        riconosci:
+            parole: ['certificazione unica', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'prospetto di liquidazione']
+        tipi:
+            cu: { etichetta: 'Certificazione Unica', parole: ['certificazione unica'] }
+            dichiarazione_730: { etichetta: 'Modello 730', parole: ['730', 'prospetto di liquidazione'] }
+            redditi_pf: { etichetta: 'Redditi PF', parole: ['redditi persone fisiche'] }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Documento' }
+            emittente: { tipo: testo, etichetta: 'Chi l''ha rilasciato' }
+            importo: { tipo: importo, etichetta: 'Reddito complessivo', etichette: ['reddito complessivo'] }
+            data: { tipo: data, etichetta: 'Data' }
+
+    altri_redditi:
+        etichetta: 'Assegni e altri trattamenti'
+        descrizione: 'Assegni di mantenimento ricevuti o versati, borse di studio e altre somme dell''anno di riferimento.'
+        per: persona
+        riconosci:
+            parole: ['assegno di mantenimento', 'assegno periodico', 'borsa di studio']
+        tipi:
+            mantenimento_ricevuto: { etichetta: 'Mantenimento ricevuto' }
+            mantenimento_versato: { etichetta: 'Mantenimento versato' }
+            borsa_studio: { etichetta: 'Borsa di studio', parole: ['borsa di studio'] }
+            altro: { etichetta: 'Altro' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Tipo' }
+            importo: { tipo: importo, etichetta: 'Importo dell''anno', obbligatorio: true }
+            emittente: { tipo: testo, etichetta: 'Da chi' }
+            data: { tipo: data, etichetta: 'Data' }
+            descrizione: { tipo: testo, etichetta: 'Descrizione', libero: true }
+
+    rapporti:
+        etichetta: 'Conti e rapporti finanziari'
+        descrizione: 'Per ogni conto, libretto, carta con IBAN o deposito titoli: saldo al 31 dicembre e giacenza media dell''anno, dalla comunicazione della banca.'
+        per: persona
+        data: libera
+        scopri: iban
+        riconosci:
+            parole: ['estratto conto', 'giacenza media', 'saldo contabile', 'comunicazione annuale', 'documento di sintesi', 'libretto di risparmio', 'deposito titoli', 'consistenza media', 'dichiarazione isee']
+        tipi:
+            conto: { etichetta: 'Conto corrente', parole: ['conto corrente', 'c/c'] }
+            libretto: { etichetta: 'Libretto di risparmio', parole: ['libretto'] }
+            carta: { etichetta: 'Carta con IBAN', parole: ['carta prepagata', 'carta conto'] }
+            deposito_titoli: { etichetta: 'Deposito titoli', parole: ['deposito titoli', 'dossier titoli'], nota: 'Titoli di Stato, buoni e libretti postali: indicali comunque. Le esclusioni previste dalla legge le applica il calcolo dell''INPS.' }
+            altro: { etichetta: 'Altro rapporto' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Rapporto' }
+            emittente: { tipo: testo, etichetta: 'Banca o intermediario' }
+            iban: { tipo: iban, etichetta: 'IBAN' }
+            importo: { tipo: importo, etichetta: 'Saldo al 31/12', obbligatorio: true, etichette: ['saldo al 31', 'saldo contabile', 'saldo finale', 'saldo'] }
+            giacenza: { tipo: importo, etichetta: 'Giacenza media annua', etichette: ['giacenza media', 'consistenza media'] }
+            saldo_precompilata: { tipo: importo, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
+            giacenza_precompilata: { tipo: importo, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
+
+    immobili:
+        etichetta: 'Casa e altri immobili'
+        descrizione: 'Visure o valori ai fini IMU di case e terreni, e il mutuo che resta da pagare.'
+        per: persona
+        somma: false
+        data: libera
+        riconosci:
+            parole: ['visura catastale', 'rendita catastale', 'valore ai fini imu', 'atto di compravendita', 'debito residuo']
+        tipi:
+            abitazione_principale: { etichetta: 'Casa in cui si vive', parole: ['abitazione principale'] }
+            altro_fabbricato: { etichetta: 'Altro fabbricato' }
+            terreno: { etichetta: 'Terreno', parole: ['terreno'] }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Immobile' }
+            descrizione: { tipo: testo, etichetta: 'Quale (indirizzo o dati catastali)', libero: true }
+            importo: { tipo: importo, etichetta: 'Rendita o valore IMU', etichette: ['rendita', 'valore ai fini imu'] }
+            mutuo_residuo: { tipo: importo, etichetta: 'Mutuo residuo al 31/12', etichette: ['debito residuo', 'capitale residuo'] }
+
+    veicoli:
+        etichetta: 'Veicoli'
+        descrizione: 'Auto e moto intestate alle persone del nucleo, con la targa.'
+        per: persona
+        somma: false
+        data: libera
+        scopri: targa
+        riconosci:
+            categorie: [veicoli]
+            parole: ['carta di circolazione', 'libretto di circolazione', 'tassa automobilistica', 'bollo auto', 'targa']
+        tipi:
+            auto: { etichetta: 'Auto', parole: ['autovettura', 'auto'] }
+            moto: { etichetta: 'Moto', parole: ['motociclo', 'moto'] }
+            altro: { etichetta: 'Altro veicolo' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Veicolo' }
+            targa: { tipo: targa, etichetta: 'Targa', obbligatorio: true }
+            descrizione: { tipo: testo, etichetta: 'Modello', libero: true }
+
+    affitto:
+        etichetta: 'Casa in affitto'
+        descrizione: 'Contratto di locazione registrato e canone annuo, se il nucleo vive in affitto.'
+        per: famiglia
+        somma: false
+        data: libera
+        riconosci:
+            parole: ['contratto di locazione', 'canone di locazione', 'canone annuo']
+        tipi:
+            abitazione: { etichetta: 'Abitazione del nucleo' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Tipo' }
+            importo: { tipo: importo, etichetta: 'Canone annuo', etichette: ['canone annuo', 'canone'] }
+            emittente: { tipo: testo, etichetta: 'Proprietario' }
+            data: { tipo: data, etichetta: 'Data del contratto' }
+
+    disabilita:
+        etichetta: 'Disabilità e non autosufficienza'
+        descrizione: 'Certificazioni di invalidità, legge 104 o non autosufficienza.'
+        per: persona
+        somma: false
+        data: libera
+        riconosci:
+            categorie: [salute]
+            parole: ['invalidità civile', 'legge 104', 'non autosufficien', 'indennità di accompagnamento', 'handicap']
+        tipi:
+            media: { etichetta: 'Disabilità media' }
+            grave: { etichetta: 'Disabilità grave', parole: ['grave'] }
+            non_autosufficienza: { etichetta: 'Non autosufficienza', parole: ['non autosufficien'] }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Condizione' }
+            emittente: { tipo: testo, etichetta: 'Chi l''ha certificata' }
+            data: { tipo: data, etichetta: 'Data del verbale' }
