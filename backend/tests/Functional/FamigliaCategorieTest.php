@@ -54,6 +54,18 @@ final class FamigliaCategorieTest extends ApiTestCase
         $this->assertStatus(422);
     }
 
+    public function testSexAcceptsUppercaseAndExplainsErrorsInItalian(): void
+    {
+        $token = $this->login($this->owner);
+        // Il modulo "Nuova persona" mandava "M": prima era rifiutato senza dire perché.
+        $p = $this->request('POST', $this->uri('membri_famiglia'), ['nome' => 'Fabio', 'cognome' => 'Rossi', 'sesso' => 'M'], $token);
+        $this->assertStatus(201);
+        self::assertSame('m', $p['sesso']);
+        $r = $this->request('POST', $this->uri('membri_famiglia'), ['nome' => 'Anna', 'cognome' => 'Rossi', 'sesso' => 'x'], $token);
+        $this->assertStatus(422);
+        self::assertSame([['sesso', 'Scegli maschio o femmina.']], array_map(static fn ($v) => [$v['propertyPath'], $v['message']], $r['violations']));
+    }
+
     public function testCodiceFiscaleUniquePerTenantNotGlobally(): void
     {
         $cf = ['nome' => 'Anna', 'codiceFiscale' => 'RSSNNA18D52F205M', 'codiceFiscaleManuale' => true];

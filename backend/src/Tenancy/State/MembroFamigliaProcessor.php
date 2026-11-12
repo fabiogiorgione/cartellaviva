@@ -80,7 +80,9 @@ final class MembroFamigliaProcessor implements ProcessorInterface
         $a = $membro->getAnagrafica();
         $a->setNome($this->clean($data->nome));
         $a->setCognome($this->clean($data->cognome));
-        $a->setSesso($this->clean($data->sesso));
+        // 'm' o 'f'; si accettano anche le maiuscole.
+        $sesso = $this->clean($data->sesso);
+        $a->setSesso(null === $sesso ? null : strtolower($sesso));
         $a->setNazioneDiNascita($data->nazioneNascita);
         $a->setComuneDiNascita($data->comuneNascita);
         $a->setCodiceFiscale($this->clean($data->codiceFiscale));

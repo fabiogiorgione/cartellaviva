@@ -123,6 +123,9 @@ class _PersonaDialogState extends State<_PersonaDialog> {
   bool saving = false;
   String? error;
 
+  /// Errori del server per campo (es. sesso, codiceFiscale), mostrati sotto il campo.
+  Map<String, String> erroriCampi = {};
+
   Future<void> _save() async {
     if (p.nome.trim().isEmpty || p.cognome.trim().isEmpty) {
       setState(() => error = 'Nome e cognome sono obbligatori.');
@@ -131,6 +134,7 @@ class _PersonaDialogState extends State<_PersonaDialog> {
     setState(() {
       saving = true;
       error = null;
+      erroriCampi = {};
     });
     try {
       final saved = await DocumentoApi.savePersona(widget.tenantId, p);
@@ -138,39 +142,47 @@ class _PersonaDialogState extends State<_PersonaDialog> {
     } on ApiException catch (e) {
       setState(() {
         saving = false;
-        error = e.message;
+        erroriCampi = e.fieldErrors;
+        // Se l'errore è su un campo lo si vede lì; il messaggio generale solo per gli altri casi.
+        error = e.fieldErrors.isEmpty ? e.message : null;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    InputDecoration deco(String label) => InputDecoration(labelText: label, isDense: true);
+    InputDecoration deco(String label, [String? campo]) => InputDecoration(labelText: label, isDense: true, errorText: campo == null ? null : erroriCampi[campo], errorMaxLines: 2);
     return AlertDialog(
       title: Text(widget.persona == null ? 'Nuova persona' : 'Modifica persona'),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextFormField(initialValue: p.nome, decoration: deco('Nome'), onChanged: (v) => p.nome = v),
+            TextFormField(initialValue: p.nome, decoration: deco('Nome', 'nome'), onChanged: (v) => p.nome = v),
             SizedBox(height: 12),
-            TextFormField(initialValue: p.cognome, decoration: deco('Cognome'), onChanged: (v) => p.cognome = v),
+            TextFormField(initialValue: p.cognome, decoration: deco('Cognome', 'cognome'), onChanged: (v) => p.cognome = v),
             SizedBox(height: 12),
-            TextFormField(initialValue: p.relazione, decoration: deco('Relazione (es. figlio, nonna)'), onChanged: (v) => p.relazione = v),
+            TextFormField(initialValue: p.relazione, decoration: deco('Relazione (es. figlio, nonna)', 'relazione'), onChanged: (v) => p.relazione = v),
             SizedBox(height: 12),
             DropdownButtonFormField<String?>(
-              initialValue: p.sesso,
-              decoration: deco('Sesso'),
+              // L'API vuole 'm' o 'f' (come l'anagrafica dell'account).
+              initialValue: p.sesso?.toLowerCase(),
+              decoration: deco('Sesso', 'sesso'),
               items: const [
                 DropdownMenuItem(value: null, child: Text('Non indicato')),
-                DropdownMenuItem(value: 'M', child: Text('M')),
-                DropdownMenuItem(value: 'F', child: Text('F')),
+                DropdownMenuItem(value: 'm', child: Text('Maschio')),
+                DropdownMenuItem(value: 'f', child: Text('Femmina')),
               ],
               onChanged: (v) => setState(() => p.sesso = v),
             ),
             SizedBox(height: 12),
             Row(children: [
-              Expanded(child: Text(p.dataNascita == null ? 'Data di nascita: non indicata' : 'Nato/a il ${formatDataBreve(p.dataNascita!)}')),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(p.dataNascita == null ? 'Data di nascita: non indicata' : 'Nato/a il ${formatDataBreve(p.dataNascita!)}'),
+                  if (erroriCampi['dataNascita'] != null) Testo.bodySmall(erroriCampi['dataNascita']!, color: ColoreStato.errore),
+                ]),
+              ),
               TextButton(
                 onPressed: () async {
                   final d = await showDatePicker(context: context, initialDate: p.dataNascita ?? DateTime(2010), firstDate: DateTime(1900), lastDate: DateTime.now());
@@ -182,7 +194,7 @@ class _PersonaDialogState extends State<_PersonaDialog> {
             SizedBox(height: 12),
             TextFormField(
               initialValue: p.codiceFiscale,
-              decoration: deco('Codice fiscale (facoltativo)'),
+              decoration: deco('Codice fiscale (facoltativo)', 'codiceFiscale'),
               textCapitalization: TextCapitalization.characters,
               maxLength: 16,
               onChanged: (v) => p.codiceFiscale = v,

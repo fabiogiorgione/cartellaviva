@@ -94,7 +94,7 @@ class Anagrafica
     private ?string $titolo = null;
 
     #[ORM\Column(length: 1, nullable: true)]
-    #[Assert\Choice(choices: [self::SESSO_MASCHIO, self::SESSO_FEMMINA])]
+    #[Assert\Choice(choices: [self::SESSO_MASCHIO, self::SESSO_FEMMINA], message: 'Scegli maschio o femmina.')]
     private ?string $sesso = null;
 
     #[ORM\Column(length: 20, nullable: true)]
