@@ -61,7 +61,8 @@ class Layout extends StatelessWidget {
           actions: [...azioniTelefono, const PulsanteTema(dimensione: 18), const MenuAccount(), const SizedBox(width: 12)],
         ),
         // SafeArea: senza, la scelta della famiglia in cima finisce sotto l'orologio.
-        drawer: dettaglio ? null : const Drawer(child: SafeArea(child: BarraLaterale())),
+        // Stesso sfondo del menu anche sotto l'orologio e sopra la barra di sistema.
+        drawer: dettaglio ? null : Drawer(backgroundColor: context.colori.barraSfondo, child: const SafeArea(child: BarraLaterale())),
         body: _contenuto(context),
       );
     }

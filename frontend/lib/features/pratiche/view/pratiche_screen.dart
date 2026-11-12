@@ -85,17 +85,16 @@ class _PraticheScreenState extends State<PraticheScreen> {
           child: const Testo.bodySmall('Le cose da sbrigare che nascono dai documenti. L\'AI propone, tu confermi.', tenue: true),
         ),
         SizedBox(height: spazioPagina),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: spazioPagina / 2),
-          child: Griglia(spaziatura: spazioPagina, celle: [
-            if (session.can('pagamento:read')) CellaGriglia(colonne: 4, child: _schedaPagamenti()),
-            if (session.can('richiesta:read')) CellaGriglia(colonne: 4, child: _schedaRichieste()),
-          ]),
-        ),
+        // Prima le pratiche (730, ISEE), poi i pagamenti. Le richieste degli enti hanno la loro voce nel menu.
         if (_pratiche != null) ...[
-          SizedBox(height: spazioPagina),
           Padding(padding: EdgeInsets.symmetric(horizontal: spazioPagina), child: _pratiche730()),
+          SizedBox(height: spazioPagina),
         ],
+        if (session.can('pagamento:read'))
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: spazioPagina / 2),
+            child: Griglia(spaziatura: spazioPagina, celle: [CellaGriglia(colonne: 4, child: _schedaPagamenti())]),
+          ),
         SizedBox(height: spazioPagina),
       ]),
     );
@@ -130,17 +129,6 @@ class _PraticheScreenState extends State<PraticheScreen> {
           ),
           const SizedBox(height: 16),
           Align(alignment: Alignment.centerLeft, child: FilledButton(onPressed: () => apriDalMenu('/pratiche/pagamenti'), child: const Text('Vedi i pagamenti'))),
-        ]),
-      );
-
-  Widget _schedaRichieste() => Scheda(
-        paddingAll: 20,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _intestazione(LucideIcons.inbox, 'Richieste dagli enti'),
-          const SizedBox(height: 12),
-          const Testo.bodyMedium('Scuola, palestra e altri enti ti chiedono documenti, moduli o conferme: le trovi qui.'),
-          const SizedBox(height: 16),
-          Align(alignment: Alignment.centerLeft, child: OutlinedButton(onPressed: () => apriDalMenu('/richieste'), child: const Text('Vedi le richieste'))),
         ]),
       );
 

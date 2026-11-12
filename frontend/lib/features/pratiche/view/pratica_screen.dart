@@ -146,6 +146,7 @@ class _PraticaScreenState extends State<PraticaScreen> {
     return Layout(
       indietro: '/pratiche',
       titolo: p?.titolo ?? 'Pratica',
+      azioniTelefono: [if (p != null && p.puoGestire) _menuTelefono(p)],
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: spazioPagina),
         child: errore != null
@@ -165,8 +166,7 @@ class _PraticaScreenState extends State<PraticaScreen> {
       _intestazione(p),
       const SizedBox(height: 12),
       if (p.provvisorio)
-        _avviso(LucideIcons.triangle_alert, ColoreStato.avviso,
-            'Regole provvisorie: sono quelle dell\'anno prima. Le istruzioni ufficiali di quest\'anno escono all\'inizio dell\'anno prossimo; allora le ricontrolliamo.'),
+        _avviso(LucideIcons.triangle_alert, ColoreStato.avviso, 'Regole provvisorie, dell\'anno prima: le ricontrolliamo quando escono le istruzioni ufficiali.'),
       if (p.inCorso && p.sulTelefono && (_sulTelefono || p.analisi.inCoda > 0))
         _sulTelefono || _modello != null
             ? _avviso(LucideIcons.smartphone, context.colori.primary,
@@ -240,21 +240,20 @@ class _PraticaScreenState extends State<PraticaScreen> {
     return _avviso(
       LucideIcons.lock,
       ColoreStato.avviso,
-      '$n ${n == 1 ? 'documento cifrato' : 'documenti cifrati'} (es. Salute, Documenti identità) ${n == 1 ? 'potrebbe servire' : 'potrebbero servire'} per questa pratica. '
-      '${p.sulTelefono ? _consensoTelefono : _consensoServer}',
+      '$n ${n == 1 ? 'documento cifrato potrebbe servire' : 'documenti cifrati potrebbero servire'} per questa pratica: li leggiamo solo con il tuo consenso.',
       azione: p.puoGestire ? FilledButton(onPressed: occupato ? null : () => _chiediConsenso(p), child: const Text('Analizza anche questi')) : null,
     );
   }
 
   static const _consensoTelefono =
-      'Li leggiamo solo se acconsenti: il testo si decifra in memoria e va solo a questo iPhone, dove lo legge il modello di Apple; non si conserva. Teniamo solo i valori (importo, data…), cifrati.';
+      'Leggiamo anche i documenti cifrati che possono servire (es. Salute, Documenti identità). Il testo si decifra in memoria e va solo a questo iPhone, dove lo legge il modello di Apple; non si conserva. Teniamo solo i valori (importo, data…), cifrati.';
   static const _consensoServer =
-      'Li leggiamo solo se acconsenti: il testo si decifra in memoria sul server, va solo all\'AI locale e non si conserva; teniamo solo i valori (importo, data…), cifrati.';
+      'Leggiamo anche i documenti cifrati che possono servire (es. Salute, Documenti identità). Il testo si decifra in memoria sul server, va solo all\'AI locale e non si conserva; teniamo solo i valori (importo, data…), cifrati.';
 
   Future<void> _chiediConsenso(Pratica p) async {
     final si = await chiediConferma(context,
         titolo: 'Analizzare i documenti cifrati?',
-        testo: 'Per questa pratica leggiamo anche i documenti cifrati che possono servire. Il consenso vale solo per questa pratica e lo puoi revocare.',
+        testo: '${p.sulTelefono ? _consensoTelefono : _consensoServer}\n\nIl consenso vale solo per questa pratica e lo puoi revocare.',
         azione: 'Acconsento');
     if (si) await _fai((t) => PraticheApi.consensoCifrati(t, p.id, true), fatto: 'Analisi dei documenti cifrati avviata.');
   }
@@ -441,20 +440,32 @@ class _PraticaScreenState extends State<PraticaScreen> {
         if (p.cosaManca.isEmpty) const Testo.bodyMedium('Niente: ci sono tutti i documenti obbligatori.'),
         for (final m in p.cosaManca)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Icon(m.dettaglio == null ? LucideIcons.circle_alert : LucideIcons.search, size: 16, color: m.dettaglio == null ? context.colori.danger : ColoreStato.avviso),
-              Testo.bodyMedium(
-                [m.etichetta, if (m.persona != null) m.persona!, if (m.dettaglio != null) 'trovato nei documenti: ${_raggruppa(m.dettaglio!)}'].join(' · '),
-                fontWeight: FontWeight.w500,
-              ),
-              if (p.puoGestire) ...[
-                TextButton(onPressed: occupato ? null : () => _aggiungi(p, requisito: m.requisito, personaId: m.personaId, valori: m.valori), child: Text(m.dettaglio == null ? 'Aggiungi' : 'Completa')),
-                TextButton(
-                  onPressed: occupato ? null : () => _fai((t) => PraticheApi.nonServe(t, p.id, requisito: m.requisito, personaId: m.personaId, dettaglio: m.dettaglio, nonServe: true)),
-                  child: const Text('Non serve'),
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(m.dettaglio == null ? LucideIcons.circle_alert : LucideIcons.search, size: 16, color: m.dettaglio == null ? context.colori.danger : ColoreStato.avviso),
                 ),
-              ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Testo.bodyMedium(
+                    [m.etichetta, if (m.persona != null) m.persona!, if (m.dettaglio != null) 'trovato nei documenti: ${_raggruppa(m.dettaglio!)}'].join(' · '),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ]),
+              if (p.puoGestire)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Row(children: [
+                    TextButton(onPressed: occupato ? null : () => _aggiungi(p, requisito: m.requisito, personaId: m.personaId, valori: m.valori), child: Text(m.dettaglio == null ? 'Aggiungi' : 'Completa')),
+                    TextButton(
+                      onPressed: occupato ? null : () => _fai((t) => PraticheApi.nonServe(t, p.id, requisito: m.requisito, personaId: m.personaId, dettaglio: m.dettaglio, nonServe: true)),
+                      child: const Text('Non serve'),
+                    ),
+                  ]),
+                ),
             ]),
           ),
         if (p.annoPrima.isNotEmpty) ...[
@@ -517,30 +528,60 @@ class _PraticaScreenState extends State<PraticaScreen> {
     );
   }
 
-  Widget _azioni(Pratica p) => Wrap(spacing: 8, runSpacing: 8, children: [
-        FilledButton.icon(
-          onPressed: occupato ? null : () => _fai((t) async => saveOrOpenFile(await PraticheApi.pacchetto(t, p.id), '${p.titolo.replaceAll(RegExp(r'[^\w\- ]+'), ' ').trim()}.zip', 'application/zip')),
-          icon: const Icon(LucideIcons.package, size: 18),
-          label: const Text('Prepara pacchetto'),
-        ),
+  void _pacchetto(Pratica p) => _fai((t) async => saveOrOpenFile(await PraticheApi.pacchetto(t, p.id), '${p.titolo.replaceAll(RegExp(r'[^\w\- ]+'), ' ').trim()}.zip', 'application/zip'));
+
+  /// Azioni secondarie della pratica: pulsanti su schermo largo, menu ⋯ in alto sul telefono.
+  List<({String etichetta, VoidCallback azione, bool pericolosa})> _altreAzioni(Pratica p) => [
         if (p.puoGestire) ...[
-          OutlinedButton(onPressed: occupato ? null : () => _archivia(p), child: const Text('Archivia una copia')),
+          (etichetta: 'Archivia una copia', azione: () => _archivia(p), pericolosa: false),
           if (p.inCorso)
-            OutlinedButton(
-              onPressed: occupato ? null : () => _fai((t) => PraticheApi.modifica(t, p.id, stato: 'inviata'), fatto: p.isee ? 'DSU segnata come presentata: il promemoria del rinnovo è nelle Scadenze.' : 'Pratica segnata come inviata.'),
-              child: Text(p.isee ? 'Segna DSU presentata' : 'Segna come inviata'),
+            (
+              etichetta: p.isee ? 'Segna DSU presentata' : 'Segna come inviata',
+              azione: () => _fai((t) => PraticheApi.modifica(t, p.id, stato: 'inviata'), fatto: p.isee ? 'DSU segnata come presentata: il promemoria del rinnovo è nelle Scadenze.' : 'Pratica segnata come inviata.'),
+              pericolosa: false,
             )
           else
-            OutlinedButton(onPressed: occupato ? null : () => _fai((t) => PraticheApi.modifica(t, p.id, stato: 'in_corso')), child: const Text('Riapri')),
-          if (p.inCorso) TextButton(onPressed: occupato ? null : () => _fai((t) => PraticheApi.analizza(t, p.id), fatto: 'Ricerca nei documenti avviata.'), child: const Text('Cerca di nuovo')),
+            (etichetta: 'Riapri', azione: () => _fai((t) => PraticheApi.modifica(t, p.id, stato: 'in_corso')), pericolosa: false),
+          if (p.inCorso) (etichetta: 'Cerca di nuovo nei documenti', azione: () => _fai((t) => PraticheApi.analizza(t, p.id), fatto: 'Ricerca nei documenti avviata.'), pericolosa: false),
           if (p.consensoCifrati != null)
-            TextButton(
-              onPressed: occupato ? null : () => _fai((t) => PraticheApi.consensoCifrati(t, p.id, false), fatto: 'Consenso revocato: i documenti cifrati non si leggono più per questa pratica.'),
-              child: const Text('Revoca consenso cifrati'),
+            (
+              etichetta: 'Revoca il consenso per i cifrati',
+              azione: () => _fai((t) => PraticheApi.consensoCifrati(t, p.id, false), fatto: 'Consenso revocato: i documenti cifrati non si leggono più per questa pratica.'),
+              pericolosa: false,
             ),
-          TextButton(onPressed: occupato ? null : () => _eliminaPratica(p), child: Text('Elimina pratica', style: TextStyle(color: context.colori.danger))),
+          (etichetta: 'Elimina pratica', azione: () => _eliminaPratica(p), pericolosa: true),
         ],
-      ]);
+      ];
+
+  Widget _menuTelefono(Pratica p) {
+    final azioni = _altreAzioni(p);
+    return PopupMenuButton<int>(
+      tooltip: 'Altre azioni',
+      icon: const Icon(LucideIcons.ellipsis_vertical, size: 20),
+      enabled: !occupato && azioni.isNotEmpty,
+      onSelected: (i) => azioni[i].azione(),
+      itemBuilder: (_) => [
+        for (final (i, a) in azioni.indexed)
+          PopupMenuItem(value: i, child: Text(a.etichetta, style: a.pericolosa ? TextStyle(color: context.colori.danger) : null)),
+      ],
+    );
+  }
+
+  Widget _azioni(Pratica p) {
+    final pacchetto = FilledButton.icon(
+      onPressed: occupato ? null : () => _pacchetto(p),
+      icon: const Icon(LucideIcons.package, size: 18),
+      label: const Text('Prepara pacchetto'),
+    );
+    if (_telefono) return Align(alignment: Alignment.centerLeft, child: pacchetto);
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      pacchetto,
+      for (final a in _altreAzioni(p))
+        a.pericolosa
+            ? TextButton(onPressed: occupato ? null : a.azione, child: Text(a.etichetta, style: TextStyle(color: context.colori.danger)))
+            : OutlinedButton(onPressed: occupato ? null : a.azione, child: Text(a.etichetta)),
+    ]);
+  }
 
   Widget _fonti(ModelloPratica info) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (info.note != null) Testo.bodySmall(info.note!, tenue: true),

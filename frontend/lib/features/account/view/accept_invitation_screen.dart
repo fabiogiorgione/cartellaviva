@@ -57,7 +57,7 @@ class _AcceptInvitationScreenState extends State<AcceptInvitationScreen> {
           SizedBox(height: 8),
           Testo.bodySmall(controller.error ?? 'Link di invito non valido.', tenue: true),
           SizedBox(height: 20),
-          SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: () => Get.offAllNamed(controller.isLoggedIn ? '/dashboard' : '/auth/login'), child: Testo.bodyMedium(controller.isLoggedIn ? 'Vai alla dashboard' : 'Vai al login', color: context.colori.onPrimary))),
+          SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Get.offAllNamed(controller.isLoggedIn ? '/dashboard' : '/auth/login'), child: Testo.bodyMedium(controller.isLoggedIn ? 'Vai alla dashboard' : 'Vai al login', color: Theme.of(context).colorScheme.onPrimary))),
         ],
       );
     }
@@ -111,7 +111,7 @@ class _AcceptInvitationScreenState extends State<AcceptInvitationScreen> {
   }
 
   Widget primaryButton(String label, VoidCallback onPressed) {
-    return SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.submitting ? null : onPressed, child: Testo.bodyMedium(controller.submitting ? 'Attendere...' : label, color: context.colori.onPrimary)));
+    return SizedBox(width: double.infinity, child: FilledButton(onPressed: controller.submitting ? null : onPressed, child: Testo.bodyMedium(controller.submitting ? 'Attendere...' : label, color: Theme.of(context).colorScheme.onPrimary)));
   }
 
   Widget field(String name, String label, {bool obscure = false}) {

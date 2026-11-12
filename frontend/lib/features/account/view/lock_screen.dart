@@ -87,7 +87,7 @@ class _LockScreenState extends State<LockScreen> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: () => controller.onLogin(), child: Row(
+                      SizedBox(width: double.infinity, child: FilledButton(onPressed: () => controller.onLogin(), child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(LucideIcons.log_in,

@@ -63,13 +63,32 @@ class FamigliaImpostazioniScreen extends StatelessWidget {
                       length: tabs.length,
                       initialIndex: initial < 0 ? 0 : initial,
                       child: Scheda(paddingAll: 0, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                          TabBar(
-                            isScrollable: true,
-                            tabAlignment: TabAlignment.start,
-                            labelColor: context.colori.primary,
-                            indicatorColor: context.colori.primary,
-                            tabs: [for (final t in tabs) Tab(text: t.$2)],
-                          ),
+                          // Sul telefono le schede non stanno in una riga: si sceglie la sezione da un elenco.
+                          if (MediaQuery.sizeOf(context).width < larghezzaTelefono)
+                            Builder(builder: (context) {
+                              final controller = DefaultTabController.of(context);
+                              return AnimatedBuilder(
+                                animation: controller,
+                                builder: (_, __) => Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                  child: DropdownButtonFormField<int>(
+                                    initialValue: controller.index,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(labelText: 'Sezione'),
+                                    items: [for (final (i, t) in tabs.indexed) DropdownMenuItem(value: i, child: Text(t.$2))],
+                                    onChanged: (i) => controller.animateTo(i ?? 0),
+                                  ),
+                                ),
+                              );
+                            })
+                          else
+                            TabBar(
+                              isScrollable: true,
+                              tabAlignment: TabAlignment.start,
+                              labelColor: context.colori.primary,
+                              indicatorColor: context.colori.primary,
+                              tabs: [for (final t in tabs) Tab(text: t.$2)],
+                            ),
                           const Divider(height: 1),
                           // Altezza libera: ogni scheda è una colonna (la pagina scorre già).
                           Builder(builder: (context) {

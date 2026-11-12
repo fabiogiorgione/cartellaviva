@@ -64,7 +64,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
                       ),
                     ),
                     SizedBox(height: 20),
-                    SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.loading ? null : controller.submit, child: Testo.bodyMedium(controller.loading ? 'Verifica...' : 'Verifica', color: context.colori.onPrimary))),
+                    SizedBox(width: double.infinity, child: FilledButton(onPressed: controller.loading ? null : controller.submit, child: Testo.bodyMedium(controller.loading ? 'Verifica...' : 'Verifica', color: Theme.of(context).colorScheme.onPrimary))),
                     SizedBox(height: 12),
                     Center(
                       child: TextButton(

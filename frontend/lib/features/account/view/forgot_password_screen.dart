@@ -72,7 +72,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   }
 
   Widget resetBtn() {
-    return SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.onLogin, child: Testo.bodyMedium(controller.busy ? "Invio…" : "Mandami il link", color: context.colori.onPrimary)));
+    return SizedBox(width: double.infinity, child: FilledButton(onPressed: controller.onLogin, child: Testo.bodyMedium(controller.busy ? "Invio…" : "Mandami il link", color: Theme.of(context).colorScheme.onPrimary)));
   }
 
   Widget email() {

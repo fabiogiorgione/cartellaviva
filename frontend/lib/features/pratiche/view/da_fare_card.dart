@@ -59,7 +59,7 @@ class _DaFareCardState extends State<DaFareCard> {
                 _riga(
                   LucideIcons.sparkles,
                   proposte == 1 ? '1 proposta da confermare' : '$proposte proposte da confermare',
-                  'Scadenze e pagamenti letti nei documenti',
+                  'Scadenze, pagamenti e voci delle pratiche letti nei documenti',
                   '/da-confermare',
                 ),
               if (inScadenza.isNotEmpty)

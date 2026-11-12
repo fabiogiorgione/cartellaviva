@@ -200,7 +200,7 @@ class _AnagraficaScreenState extends State<AnagraficaScreen> {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         if (formError != null) Expanded(child: Testo.bodySmall(formError, color: context.colori.danger)),
-        FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.saving ? null : controller.save, child: Testo.bodyMedium(controller.saving ? 'Salvataggio...' : (controller.onboarding ? 'Salva e continua' : 'Salva'), color: context.colori.onPrimary)),
+        FilledButton(style: FilledButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16)), onPressed: controller.saving ? null : controller.save, child: Testo.bodyMedium(controller.saving ? 'Salvataggio...' : (controller.onboarding ? 'Salva e continua' : 'Salva'), color: Theme.of(context).colorScheme.onPrimary)),
       ],
     );
   }

@@ -335,7 +335,8 @@ class _AiutoScreenState extends State<AiutoScreen> {
           Wrap(spacing: 12, runSpacing: 12, children: [
             for (final g in mieGuide)
               SizedBox(
-                width: 300,
+                // Sul telefono a tutta larghezza, allineate alle altre schede.
+                width: MediaQuery.sizeOf(context).width < larghezzaTelefono ? double.infinity : 300,
                 child: Scheda(paddingAll: 16, child: InkWell(
                     onTap: () => Get.toNamed('/aiuto/guida', parameters: {'id': g.id}),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -43,7 +43,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Testo.titleMedium("Sicurezza account", fontSize: 18, fontWeight: FontWeight.w500),
+                    Flexible(child: Testo.titleMedium("Sicurezza e accesso", fontSize: 18, fontWeight: FontWeight.w500)),
                     Briciole(voci: [Briciola(nome: 'Account'), Briciola(nome: 'Sicurezza', attiva: true)]),
                   ],
                 ),
@@ -91,7 +91,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         SizedBox(height: 16),
         if (controller.freshBackupCodes != null) backupCodesBox(),
         if (!enabled && controller.setup == null)
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : controller.startSetup, child: Testo.bodyMedium('Attiva', color: context.colori.onPrimary)),
+          FilledButton(onPressed: controller.busy ? null : controller.startSetup, child: Testo.bodyMedium('Attiva', color: Theme.of(context).colorScheme.onPrimary)),
         if (controller.setup != null) setupSteps(),
         if (enabled) manageEnabled(),
       ],
@@ -122,7 +122,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         codeField(),
         SizedBox(height: 12),
         Row(children: [
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : controller.confirmSetup, child: Testo.bodyMedium('Conferma e attiva', color: context.colori.onPrimary)),
+          FilledButton(onPressed: controller.busy ? null : controller.confirmSetup, child: Testo.bodyMedium('Conferma e attiva', color: Theme.of(context).colorScheme.onPrimary)),
           SizedBox(width: 12),
           TextButton(onPressed: controller.cancelSetup, child: Text('Annulla')),
         ]),
@@ -139,7 +139,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         codeField(allowBackup: true),
         SizedBox(height: 12),
         Wrap(spacing: 12, runSpacing: 8, children: [
-          OutlinedButton(style: OutlinedButton.styleFrom(side: BorderSide(color: context.colori.primary), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : controller.regenerateBackupCodes, child: Testo.bodySmall('Rigenera codici di recupero', color: context.colori.primary)),
+          OutlinedButton(onPressed: controller.busy ? null : controller.regenerateBackupCodes, child: Testo.bodySmall('Rigenera codici di recupero', color: Theme.of(context).colorScheme.primary)),
           OutlinedButton(style: OutlinedButton.styleFrom(side: BorderSide(color: context.colori.danger), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : () => confirmDisable(), child: Testo.bodySmall('Disattiva', color: context.colori.danger)),
         ]),
       ],
@@ -241,7 +241,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         ]),
         SizedBox(height: 16),
         Wrap(spacing: 12, runSpacing: 8, children: [
-          OutlinedButton(style: OutlinedButton.styleFrom(side: BorderSide(color: context.colori.primary), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy
+          OutlinedButton(onPressed: controller.busy
                 ? null
                 : () async {
                     if (await showCambiaPasswordDialog(context, haPassword: hasPassword)) {
@@ -250,7 +250,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                     }
                   }, child: Testo.bodySmall(hasPassword ? 'Cambia password' : 'Imposta una password', color: context.colori.primary)),
           if (hasPassword)
-            OutlinedButton(style: OutlinedButton.styleFrom(side: BorderSide(color: context.colori.primary), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : () => showCambiaEmailDialog(context), child: Testo.bodySmall('Cambia email', color: context.colori.primary)),
+            OutlinedButton(onPressed: controller.busy ? null : () => showCambiaEmailDialog(context), child: Testo.bodySmall('Cambia email', color: Theme.of(context).colorScheme.primary)),
         ]),
       ],
     );

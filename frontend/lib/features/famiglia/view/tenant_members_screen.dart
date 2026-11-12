@@ -109,7 +109,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
               ),
             ],
           ),
-          Testo.bodySmall('${controller.members.length} membri · ${controller.activeOwners} proprietari attivi', tenue: true),
+          Testo.bodySmall('${controller.members.length} ${controller.members.length == 1 ? 'membro' : 'membri'} · ${controller.activeOwners} ${controller.activeOwners == 1 ? 'proprietario attivo' : 'proprietari attivi'}', tenue: true),
         ],
       ));
   }
@@ -290,7 +290,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
               onChanged: enabled ? (value) => controller.inviteRoleId = value : null,
             ),
             SizedBox(height: 16),
-            SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: enabled && !controller.inviting ? controller.invite : null, child: Testo.bodyMedium(controller.inviting ? 'Invio...' : 'Invia invito', color: context.colori.onPrimary))),
+            SizedBox(width: double.infinity, child: FilledButton(onPressed: enabled && !controller.inviting ? controller.invite : null, child: Testo.bodyMedium(controller.inviting ? 'Invio...' : 'Invia invito', color: Theme.of(context).colorScheme.onPrimary))),
             if (controller.invitations.isNotEmpty) ...[
               SizedBox(height: 24),
               Testo.bodyMedium("Inviti", fontWeight: FontWeight.w500),

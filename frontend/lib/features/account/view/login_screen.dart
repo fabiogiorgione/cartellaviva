@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget loginBtn() {
-    return SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.loading ? null : () => controller.onLogin(), child: Row(
+    return SizedBox(width: double.infinity, child: FilledButton(onPressed: controller.loading ? null : () => controller.onLogin(), child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (controller.loading)

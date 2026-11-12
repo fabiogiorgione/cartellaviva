@@ -80,7 +80,7 @@ class _BenvenutoScreenState extends State<BenvenutoScreen> {
                   child: Scheda(paddingAll: 20, child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(children: [Icon(LucideIcons.house, color: context.colori.primary), SizedBox(width: 10), Testo.bodyLarge('Crea la tua famiglia', fontWeight: FontWeight.w500)]),
+                        Row(children: [Icon(LucideIcons.house, color: context.colori.primary), SizedBox(width: 10), Expanded(child: Testo.bodyLarge('Crea la tua famiglia', fontWeight: FontWeight.w500))]),
                         SizedBox(height: 8),
                         Testo.bodySmall('Diventi proprietario: potrai invitare gli altri e caricare documenti.', tenue: true),
                         SizedBox(height: 16),
@@ -100,7 +100,7 @@ class _BenvenutoScreenState extends State<BenvenutoScreen> {
                   child: Scheda(paddingAll: 20, child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [Icon(LucideIcons.mail, color: context.colori.primary), SizedBox(width: 10), Testo.bodyLarge('Aspetti un invito?', fontWeight: FontWeight.w500)]),
+                        Row(children: [Icon(LucideIcons.mail, color: context.colori.primary), SizedBox(width: 10), Expanded(child: Testo.bodyLarge('Aspetti un invito?', fontWeight: FontWeight.w500))]),
                         SizedBox(height: 8),
                         Testo.bodySmall('Se un familiare, una scuola o un\'associazione ti ha invitato, apri il link che hai ricevuto via email: entrerai direttamente.', tenue: true),
                       ],
@@ -111,7 +111,7 @@ class _BenvenutoScreenState extends State<BenvenutoScreen> {
                   child: Scheda(paddingAll: 20, child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [Icon(LucideIcons.building, color: context.colori.primary), SizedBox(width: 10), Testo.bodyLarge('Lavori per una scuola o un\'associazione?', fontWeight: FontWeight.w500)]),
+                        Row(children: [Icon(LucideIcons.building, color: context.colori.primary), SizedBox(width: 10), Expanded(child: Testo.bodyLarge('Lavori per una scuola o un\'associazione?', fontWeight: FontWeight.w500))]),
                         SizedBox(height: 8),
                         Testo.bodySmall('Registra l\'ente: confermi l\'email istituzionale e, dopo la verifica, potrai collegare le famiglie e chiedere firme e documenti.', tenue: true),
                         SizedBox(height: 16),

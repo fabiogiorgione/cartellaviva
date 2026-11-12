@@ -151,7 +151,8 @@ class _IdeaFormState extends State<IdeaForm> {
         Testo.bodySmall('Raccontaci cosa vorresti fare con l\'app o cosa renderesti più semplice. Leggiamo tutte le proposte.', tenue: true),
         SizedBox(height: 12),
         SegmentedButton<String>(
-          segments: [for (final e in tipiIdea.entries) ButtonSegment(value: e.key, label: Text(e.value))],
+          // Etichette corte: "Nuova funzionalità" non sta nel pulsante del telefono.
+          segments: [for (final e in tipiIdea.entries) ButtonSegment(value: e.key, label: Text(e.key == 'funzionalita' ? 'Novità' : e.value))],
           selected: {tipo},
           onSelectionChanged: (s) => setState(() => tipo = s.first),
         ),

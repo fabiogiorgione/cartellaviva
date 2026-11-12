@@ -11,6 +11,7 @@ import 'package:cartellaviva/features/scadenze/model/scadenza.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenza_form.dart';
 import 'package:cartellaviva/features/scadenze/view/proposta_telefono.dart';
 import 'package:cartellaviva/layout/layout.dart' show larghezzaTelefono;
+import 'package:cartellaviva/layout/navigazione.dart';
 
 /// Conferma di una scadenza trovata in un documento: apre il modulo già
 /// compilato (titolo, data, documento, persona, categoria, promemoria a 30
@@ -94,7 +95,9 @@ class PropostaTile extends StatelessWidget {
   }
 }
 
-/// "Scadenze trovate nei documenti" (dashboard e scadenziario). Invisibile se non ce ne sono.
+/// Rimando alla coda "Da confermare" quando ci sono scadenze trovate nei
+/// documenti (dashboard e scadenziario). Le proposte si decidono in un posto
+/// solo, con le stesse parole; qui resta una riga. Invisibile se non ce ne sono.
 class ScadenzeProposteCard extends StatefulWidget {
   final VoidCallback? onCambiate;
 
@@ -106,7 +109,6 @@ class ScadenzeProposteCard extends StatefulWidget {
 
 class _ScadenzeProposteCardState extends State<ScadenzeProposteCard> {
   List<ScadenzaProposta> proposte = const [];
-  bool tutte = false;
 
   @override
   void initState() {
@@ -128,22 +130,29 @@ class _ScadenzeProposteCardState extends State<ScadenzeProposteCard> {
   @override
   Widget build(BuildContext context) {
     if (proposte.isEmpty) return const SizedBox.shrink();
+    final n = proposte.length;
     return Padding(
-      padding: EdgeInsets.only(bottom: 16),
-      child: Scheda(paddingAll: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Testo.titleSmall('Scadenze trovate nei documenti', fontWeight: FontWeight.w600),
-          Testo.bodySmall('Le abbiamo lette dal testo dei documenti: diventano scadenze solo se le confermi.', tenue: true),
-          for (final p in (MediaQuery.of(context).size.width < larghezzaTelefono && !tutte ? proposte.take(3) : proposte))
-            PropostaTile(
-              proposta: p,
-              onDecisa: () {
-                _load();
-                widget.onCambiate?.call();
-              },
-            ),
-          if (MediaQuery.of(context).size.width < larghezzaTelefono && !tutte && proposte.length > 3)
-            TextButton(onPressed: () => setState(() => tutte = true), child: Text('Mostra tutte (${proposte.length})')),
-        ])),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Scheda(
+        paddingAll: 0,
+        child: InkWell(
+          onTap: () => apriDalMenu('/da-confermare'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Icon(LucideIcons.sparkles, size: 20, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Testo.bodyMedium('$n ${n == 1 ? 'scadenza trovata' : 'scadenze trovate'} nei documenti', fontWeight: FontWeight.w600),
+                  const Testo.bodySmall('Da confermare: diventano scadenze solo se le confermi.', tenue: true),
+                ]),
+              ),
+              const Icon(LucideIcons.chevron_right, size: 18),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }

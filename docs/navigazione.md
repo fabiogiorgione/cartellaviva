@@ -70,6 +70,23 @@ Schermo largo:
 - Voce attiva del menu spenta nei dettagli, barra in alto sotto l'orologio dell'iPad, filtri a lato che stringevano la tabella, pulsante "schermo intero" anche nell'app. *Corretto.*
 - Nella tabella documenti stretta (accanto al menu, sotto i 1100 pixel) la data andava a capo: *corretto*, "Riguarda" si vede nel dettaglio. "Contatto d'emergenza" ora spiega cosa mostra e rimanda a Impostazioni famiglia › Emergenza.
 
+## Secondo giro sul telefono (12/11/2026, simulatore iPhone 17, dopo le Pratiche)
+
+Tutte le pagine della famiglia, il cassetto, un modulo a tutta pagina, il tema scuro e il fondo delle pagine lunghe. Trovati e *corretti*:
+- "Scansiona o carica" permetteva solo foto e galleria: ora c'è anche **Scegli un file** (PDF dall'app File), con lo stesso caricamento della lista documenti.
+- Le scadenze proposte comparivano sia in Scadenze sia in Da confermare, con parole diverse, e in Scadenze riempivano il primo schermo: ora in Scadenze c'è una riga "6 scadenze trovate nei documenti" che porta a Da confermare (in Home basta la scheda "Da fare").
+- Pagina della pratica: gli avvisi (regole provvisorie, consenso per i cifrati) occupavano tutto il primo schermo; ora una frase ciascuno, e la spiegazione sulla privacy sta nel dialogo del consenso. Le azioni secondarie (Archivia, Segna inviata, Cerca di nuovo, Revoca consenso, Elimina) sul telefono stanno nel menu ⋯ della barra in alto; sotto resta solo "Prepara pacchetto".
+- "Cosa manca": i pulsanti Aggiungi / Non serve andavano a capo in modo diverso a seconda del testo; ora testo sopra e pulsanti sotto, sempre.
+- Pratiche: prima 730 e ISEE, poi i Pagamenti; tolta la scheda "Richieste dagli enti" (c'è nel menu).
+- Benvenuto: un titolo usciva dallo schermo di 32 pixel (unico errore di layout nel log del giro); ora va a capo.
+- Home e Aiuto: tessere e guide di misura fissa lasciavano spazio vuoto a destra; ora a tutta larghezza.
+- Pulsanti di accesso, sicurezza, anagrafica e inviti con un blu diverso dal resto e angoli squadrati (stile scritto a mano): ora usano il tema.
+- Cassetto del menu con strisce bianche sotto l'orologio e in fondo: ora tutto del colore del menu.
+- Testi: "1 proprietari attivi" → "1 proprietario attivo"; "Sicurezza account" → "Sicurezza e accesso", come nel menu; in Home "Scadenze, pagamenti e voci delle pratiche"; "Novità" nel pulsante del tipo di idea.
+- Impostazioni famiglia: le schede non stavano in una riga ("Enti collegati" tagliata, "Emergenza" nascosta); sul telefono ora si sceglie la sezione da un elenco.
+
+Da provare su un iPhone vero: la tastiera sopra i moduli (nel simulatore non compare).
+
 ## Come si prova
 
 - `dart analyze` senza problemi e `flutter test` verde.

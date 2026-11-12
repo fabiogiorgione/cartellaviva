@@ -91,7 +91,7 @@ class _RegisterAccountScreenState extends State<RegisterAccountScreen>
   }
 
   Widget signUpBtn() {
-    return SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: context.colori.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.loading ? null : () => controller.onRegister(), child: Testo.bodyMedium(controller.loading ? "Creazione in corso..." : "Crea account", color: context.colori.onPrimary)));
+    return SizedBox(width: double.infinity, child: FilledButton(onPressed: controller.loading ? null : () => controller.onRegister(), child: Testo.bodyMedium(controller.loading ? "Creazione in corso..." : "Crea account", color: Theme.of(context).colorScheme.onPrimary)));
   }
 
   Widget rememberButton() {

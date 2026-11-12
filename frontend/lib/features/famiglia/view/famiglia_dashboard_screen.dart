@@ -14,7 +14,6 @@ import 'package:cartellaviva/features/scadenze/model/scadenza.dart' show formatD
 import 'package:cartellaviva/features/documenti/view/documenti_screen.dart' show hexColor;
 import 'package:cartellaviva/layout/layout.dart';
 import 'package:cartellaviva/features/scadenze/view/prossime_scadenze_card.dart';
-import 'package:cartellaviva/features/scadenze/view/scadenze_proposte.dart';
 import 'package:cartellaviva/features/pratiche/view/da_fare_card.dart';
 
 /// Home della famiglia: azioni rapide, prossime scadenze, ultimi documenti.
@@ -71,7 +70,6 @@ class _FamigliaDashboardScreenState extends State<FamigliaDashboardScreen> {
             child: Griglia(spaziatura: spazioPagina, celle: [
               if (s.can('scadenza:read'))
                 CellaGriglia(colonne: 6, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    if (s.can('scadenza:manage', resourceOwnerId: s.me?.id)) ScadenzeProposteCard(onCambiate: () => _scadenzeKey.currentState?.reload()),
                     ProssimeScadenzeCard(key: _scadenzeKey),
                   ])),
               if (_ultimi != null) CellaGriglia(colonne: 6, child: _ultimiDocumenti()),
@@ -89,17 +87,22 @@ class _FamigliaDashboardScreenState extends State<FamigliaDashboardScreen> {
       if (s.can('scadenza:read')) (LucideIcons.calendar_clock, 'Scadenze', '/scadenze'),
       if (s.can('import:manage')) (LucideIcons.cloud_download, 'Google Drive', '/famiglia/impostazioni?scheda=drive'),
     ];
-    return Wrap(spacing: 12, runSpacing: 12, children: [
+    // Sul telefono due tessere per riga a tutta larghezza; su schermo largo di misura fissa.
+    return LayoutBuilder(builder: (context, vincoli) {
+      final telefono = MediaQuery.sizeOf(context).width < larghezzaTelefono;
+      final larga = telefono ? ((vincoli.maxWidth - 12) / 2).floorToDouble() : 150.0;
+      return Wrap(spacing: 12, runSpacing: 12, children: [
       for (final a in azioni)
         SizedBox(
-          width: 150,
+          width: larga,
           child: Scheda(onTap: () => Get.toNamed(a.$3), paddingAll: 16, child: Column(children: [
               Icon(a.$1, color: context.colori.primary, size: 26),
               SizedBox(height: 8),
               Testo.labelLarge(a.$2, fontWeight: FontWeight.w500),
             ])),
         ),
-    ]);
+      ]);
+    });
   }
 
   Widget _ultimiDocumenti() {

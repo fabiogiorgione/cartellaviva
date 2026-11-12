@@ -8,7 +8,14 @@ import 'package:get/get.dart';
 import 'package:cartellaviva/features/documenti/controller/nuovo_documento_controller.dart';
 import 'package:cartellaviva/features/documenti/scan/document_capture.dart';
 import 'package:cartellaviva/features/documenti/scan/scan_draft.dart';
+import 'package:cartellaviva/features/documenti/api/documento_api.dart';
+import 'package:cartellaviva/features/documenti/model/documento.dart' show Categoria, MembroFamiglia;
+import 'package:cartellaviva/features/documenti/view/caricamento_dialog.dart';
+import 'package:cartellaviva/helpers/services/api/api_exception.dart';
+import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/layout/layout.dart';
+import 'package:cartellaviva/layout/navigazione.dart';
+import 'package:cartellaviva/widgets/messaggio.dart';
 import 'package:cartellaviva/widgets/conferma.dart';
 
 /// "Nuovo documento": scansione multipagina -> PDF -> upload.
@@ -30,6 +37,22 @@ class _NuovoDocumentoScreenState extends State<NuovoDocumentoScreen> {
   void dispose() {
     titolo.dispose();
     super.dispose();
+  }
+
+  /// File già pronti (PDF, foto, documenti Office): categoria e persone nel dialogo, poi alla lista.
+  Future<void> _caricaFile() async {
+    final tenantId = SessionService.to.currentTenantId;
+    if (tenantId == null) return;
+    final files = await scegliFile();
+    if (files.isEmpty || !mounted) return;
+    try {
+      final opzioni = await Future.wait([DocumentoApi.categorie(tenantId), DocumentoApi.membriFamiglia(tenantId)]);
+      if (!mounted) return;
+      final creati = await showCaricamentoDialog(context, tenantId: tenantId, files: files, categorie: opzioni[0] as List<Categoria>, persone: opzioni[1] as List<MembroFamiglia>);
+      if (creati > 0) apriDalMenu('/documenti');
+    } on ApiException catch (e) {
+      if (mounted) mostraMessaggio(context, e.message, errore: true);
+    }
   }
 
   @override
@@ -116,6 +139,13 @@ class _NuovoDocumentoScreenState extends State<NuovoDocumentoScreen> {
                       icon: Icon(LucideIcons.image, size: 18),
                       label: Text('Dalla galleria'),
                     ),
+                    // PDF e altri file (app File, iCloud, Drive): stesso caricamento della lista documenti.
+                    if (richiestaId == null && c.pages.isEmpty)
+                      OutlinedButton.icon(
+                        onPressed: _caricaFile,
+                        icon: Icon(LucideIcons.file_up, size: 18),
+                        label: Text('Scegli un file'),
+                      ),
                   ],
                 ),
               ],
