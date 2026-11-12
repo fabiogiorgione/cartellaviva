@@ -1,0 +1,150 @@
+# Modello di pratica: 730 per le spese del 2026 (dichiarazione 730/2027).
+#
+# PROVVISORIO: copia delle regole del 2025. Le istruzioni del 730/2027 escono
+# all'inizio del 2027: allora va ricontrollato e va scritta la data in "verificato".
+#
+# Il file elenca cosa raccogliere e come riconoscerlo nei documenti; l'app NON
+# calcola detrazioni né imposte. Lo verifica ogni anno chi mantiene il progetto,
+# sulle istruzioni ufficiali, prima di attivarlo: scrivere la data in "verificato".
+# Formato: vedi docs/pratiche.md, "Il motore comune".
+modello: '730'
+anno: 2026
+titolo: '730/2027 · spese 2026'
+descrizione: 'Le spese da detrarre e i redditi del 2026, raccolti dai documenti, per la dichiarazione del 2027.'
+verificato: ~
+fonti:
+    - titolo: 'Agenzia delle Entrate, La dichiarazione precompilata 2026'
+      url: 'https://www.agenziaentrate.gov.it/portale/la-dichiarazione-precompilata-20261'
+    - titolo: 'Agenzia delle Entrate, Le spese sanitarie e i mezzi di ausilio'
+      url: 'https://www.agenziaentrate.gov.it/portale/le-spese-sanitarie-e-i-mezzi-di-ausilio'
+    - titolo: 'Agenzia delle Entrate, Info precompilata: spese sanitarie'
+      url: 'https://infoprecompilata.agenziaentrate.gov.it/portale/spese-sanitarie'
+note: >-
+    Detrazione del 19%: serve il pagamento tracciabile (bonifico, carte, assegni),
+    tranne per medicinali, dispositivi medici e prestazioni di strutture pubbliche
+    o accreditate al Servizio sanitario nazionale.
+
+# Campi comuni a tutte le spese (ancora YAML).
+_spesa: &spesa
+    tipo: { tipo: scelta, etichetta: 'Tipo di spesa' }
+    importo: { tipo: importo, etichetta: 'Importo', obbligatorio: true }
+    data: { tipo: data, etichetta: 'Data', obbligatorio: true }
+    emittente: { tipo: testo, etichetta: 'Chi l''ha emessa' }
+    tracciabile: { tipo: tracciabile, etichetta: 'Pagamento tracciabile' }
+    descrizione: { tipo: testo, etichetta: 'Descrizione', libero: true }
+
+requisiti:
+    cu:
+        etichetta: 'Certificazione Unica'
+        descrizione: 'La CU del datore di lavoro o dell''ente che paga la pensione, con i redditi del 2026.'
+        per: persona
+        obbligatorio: true
+        somma: false
+        data: dopo
+        riconosci:
+            parole: ['certificazione unica', 'sostituto d''imposta', 'redditi di lavoro dipendente', 'cu 2027']
+        campi:
+            emittente: { tipo: testo, etichetta: 'Datore di lavoro o ente', obbligatorio: true }
+            importo: { tipo: importo, etichetta: 'Reddito indicato' }
+            data: { tipo: data, etichetta: 'Data della certificazione' }
+
+    spesa_sanitaria:
+        etichetta: 'Spese sanitarie'
+        descrizione: 'Farmacia, ticket, visite ed esami, dispositivi medici.'
+        per: persona
+        riconosci:
+            categorie: [salute, farmaci]
+            parole: ['farmacia', 'scontrino parlante', 'ticket', 'visita specialistica', 'prestazione sanitaria', 'dispositivo medico', 'codice fiscale del destinatario', 'esami di laboratorio', 'fattura sanitaria']
+        tipi:
+            farmaci: { etichetta: 'Farmaci', tracciabile: non_richiesto, parole: ['farmac', 'medicinal'] }
+            dispositivi: { etichetta: 'Dispositivi medici', tracciabile: non_richiesto, parole: ['dispositivo medico', 'dispositivi medici', 'marcatura ce', 'occhiali', 'lenti'] }
+            ticket: { etichetta: 'Ticket del Servizio sanitario', tracciabile: non_richiesto, parole: ['ticket', 'servizio sanitario'] }
+            visite: { etichetta: 'Visite ed esami', tracciabile: dipende, parole: ['visita', 'esame', 'esami', 'ecografia', 'analisi', 'prestazione sanitaria', 'fisioterap', 'dentist', 'odontoiatr'], nota: 'Serve il pagamento tracciabile, tranne nelle strutture pubbliche o accreditate al Servizio sanitario nazionale.' }
+            altro: { etichetta: 'Altre spese sanitarie', tracciabile: richiesto }
+        campi: *spesa
+
+    spesa_veterinaria:
+        etichetta: 'Spese veterinarie'
+        descrizione: 'Visite, analisi, interventi e farmaci per gli animali di casa.'
+        per: famiglia
+        riconosci:
+            parole: ['veterinari', 'clinica veterinaria', 'ambulatorio veterinario']
+        tipi:
+            visite: { etichetta: 'Visite e interventi', tracciabile: richiesto, parole: ['visita', 'intervento', 'analisi'] }
+            farmaci: { etichetta: 'Farmaci veterinari', tracciabile: non_richiesto, parole: ['farmac', 'medicinal'] }
+        campi: *spesa
+
+    istruzione:
+        etichetta: 'Istruzione'
+        descrizione: 'Scuola (mensa, gite, contributi), università.'
+        per: persona
+        riconosci:
+            categorie: [scuola]
+            parole: ['retta', 'tassa universitaria', 'contributo scolastico', 'mensa scolastica']
+        tipi:
+            scuola: { etichetta: 'Scuola', tracciabile: richiesto, parole: ['scuola', 'scolastic', 'istituto comprensivo', 'liceo', 'mensa'] }
+            universita: { etichetta: 'Università', tracciabile: richiesto, parole: ['universit', 'ateneo', 'politecnico'] }
+        campi: *spesa
+
+    sport_ragazzi:
+        etichetta: 'Sport dei ragazzi'
+        descrizione: 'Iscrizione a palestre e associazioni sportive per i ragazzi dai 5 ai 18 anni.'
+        per: persona
+        riconosci:
+            parole: ['associazione sportiva', 'società sportiva', 'palestra', 'piscina', 'quota associativa', 'a.s.d.', 'ssd']
+        tipi:
+            sport: { etichetta: 'Attività sportiva', tracciabile: richiesto }
+        campi: *spesa
+
+    assicurazioni:
+        etichetta: 'Assicurazioni vita e infortuni'
+        descrizione: 'Quietanze o attestazioni dei premi pagati.'
+        per: persona
+        riconosci:
+            parole: ['polizza vita', 'premio assicurativo', 'rischio morte', 'attestazione premi']
+        tipi:
+            vita: { etichetta: 'Vita e infortuni', tracciabile: richiesto }
+        campi: *spesa
+
+    interessi_mutuo:
+        etichetta: 'Interessi del mutuo'
+        descrizione: 'La certificazione degli interessi pagati, rilasciata dalla banca.'
+        per: persona
+        riconosci:
+            parole: ['interessi passivi', 'mutuo ipotecario', 'certificazione interessi', 'abitazione principale']
+        tipi:
+            prima_casa: { etichetta: 'Mutuo abitazione principale', tracciabile: non_richiesto }
+        campi: *spesa
+
+    affitto:
+        etichetta: 'Affitto'
+        descrizione: 'Contratto e ricevute del canone (es. studenti fuori sede).'
+        per: persona
+        riconosci:
+            parole: ['canone di locazione', 'contratto di locazione', 'fuori sede']
+        tipi:
+            studenti: { etichetta: 'Studenti fuori sede', tracciabile: richiesto, parole: ['fuori sede', 'studente', 'universit'] }
+            abitazione: { etichetta: 'Abitazione principale', tracciabile: non_richiesto }
+        campi: *spesa
+
+    erogazioni_liberali:
+        etichetta: 'Donazioni'
+        descrizione: 'Erogazioni liberali a enti del terzo settore, ONLUS, partiti.'
+        per: persona
+        riconosci:
+            parole: ['erogazione liberale', 'donazione', 'onlus', 'ente del terzo settore']
+        tipi:
+            donazione: { etichetta: 'Donazione', tracciabile: richiesto }
+        campi: *spesa
+
+    spese_casa:
+        etichetta: 'Lavori in casa'
+        descrizione: 'Ristrutturazioni, risparmio energetico, mobili: fatture e bonifici "parlanti".'
+        per: persona
+        riconosci:
+            categorie: [casa]
+            parole: ['bonifico parlante', 'ristrutturazione edilizia', 'riqualificazione energetica', 'art. 16-bis', 'ecobonus']
+        tipi:
+            ristrutturazione: { etichetta: 'Ristrutturazione', parole: ['ristruttura', '16-bis', 'manutenzione straordinaria'], tracciabile: richiesto, nota: 'Serve il bonifico "parlante" con la causale della detrazione.' }
+            energia: { etichetta: 'Risparmio energetico', parole: ['energetic', 'ecobonus', 'caldaia', 'infissi', 'pannelli'], tracciabile: richiesto, nota: 'Serve il bonifico "parlante" con la causale della detrazione.' }
+        campi: *spesa

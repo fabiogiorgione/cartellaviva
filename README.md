@@ -485,7 +485,7 @@ Solo nelle app **Android e iOS**: sul web la pagina mostra un avviso. Si apre da
 
 **Requisiti nativi**:
 - Android: minSdk 24, permesso `CAMERA`;
-- iOS: deployment target 13.0, `NSCameraUsageDescription` e `NSPhotoLibraryUsageDescription`.
+- iOS: deployment target 15.0, `NSCameraUsageDescription` e `NSPhotoLibraryUsageDescription`.
 
 **Progetto Android**:
 - la cartella `android/` è generata da Flutter 3.44 (Gradle 9.1, AGP 9.0.1, Kotlin 2.3, Java 17).

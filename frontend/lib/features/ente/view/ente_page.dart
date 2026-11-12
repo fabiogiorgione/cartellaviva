@@ -16,19 +16,26 @@ class PaginaEnte extends StatelessWidget {
   final Widget child;
   final List<Widget> azioni;
 
-  const PaginaEnte({super.key, required this.titolo, required this.sezione, required this.child, this.azioni = const []});
+  /// Rotta della pagina genitore, se è un dettaglio (freccia indietro sul telefono).
+  final String? indietro;
+
+  const PaginaEnte({super.key, required this.titolo, required this.sezione, required this.child, this.azioni = const [], this.indietro});
 
   @override
   Widget build(BuildContext context) {
     final membership = SessionService.to.currentMembership;
     return Layout(
+      indietro: indietro,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: spazioPagina),
           child: Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, spacing: 12, runSpacing: 8, children: [
             Testo.titleMedium(titolo, fontSize: 18, fontWeight: FontWeight.w500),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              ...azioni.expand((a) => [a, SizedBox(width: 8)]),
+            // Sul telefono il titolo ha la sua riga: i pulsanti vanno sotto.
+            if (MediaQuery.of(context).size.width < larghezzaTelefono) SizedBox(width: double.infinity, height: 0),
+            // Wrap (non Row): sul telefono i pulsanti vanno a capo invece di uscire dallo schermo.
+            Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              ...azioni,
               Briciole(voci: [Briciola(nome: 'Ente', rotta: '/ente'), Briciola(nome: sezione, attiva: true)]),
             ]),
           ]),

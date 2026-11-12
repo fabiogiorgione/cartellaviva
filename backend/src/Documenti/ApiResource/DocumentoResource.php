@@ -129,6 +129,24 @@ final class DocumentoResource
     public ?array $scadenzaProposta = null;
 
     /**
+     * Solo nel dettaglio: avviso di pagamento trovato nel testo e ancora da decidere
+     * (stessa forma di un elemento di GET /pagamenti-proposte); solo per chi può creare pagamenti.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[Groups(['documento:read'])]
+    public ?array $pagamentoProposta = null;
+
+    /**
+     * Solo nel dettaglio: pagamenti collegati al documento ("Usato in: Pagamenti"),
+     * come origine o come ricevuta; vuoto se l'utente non può leggere i pagamenti.
+     *
+     * @var list<array{id: string, titolo: string, stato: string, ruolo: string}>
+     */
+    #[Groups(['documento:read'])]
+    public array $pagamenti = [];
+
+    /**
      * Solo nel dettaglio e solo per i documenti non cifrati: dati estratti dal
      * testo ({emittente, data, importo, numero, intestatario}), tag e riferimenti
      * (targa, POD, polizza...). Null = non ancora analizzato o documento cifrato.

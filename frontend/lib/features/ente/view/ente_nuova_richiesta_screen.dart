@@ -134,6 +134,7 @@ class _EnteNuovaRichiestaScreenState extends State<EnteNuovaRichiestaScreen> {
     final raggiunti = (anteprima?.famiglie ?? 0) + (anteprima?.viaLink ?? 0);
     final pronto = titolo.text.trim().isNotEmpty && destinatarioOk && (tipo != 'firma' || haPdf) && raggiunti > 0;
     return PaginaEnte(
+      indietro: '/ente/richieste',
       titolo: 'Nuova richiesta',
       sezione: 'Richieste',
       child: Wrap(spacing: 20, runSpacing: 20, crossAxisAlignment: WrapCrossAlignment.start, children: [
@@ -142,11 +143,13 @@ class _EnteNuovaRichiestaScreenState extends State<EnteNuovaRichiestaScreen> {
           child: Scheda(paddingAll: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Testo.labelMedium('Tipo'),
               SizedBox(height: 6),
+              // Sul telefono senza icone: con tre segmenti le parole andavano a capo a metà.
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'firma', label: Text('Firma'), icon: Icon(LucideIcons.pen_line)),
-                  ButtonSegment(value: 'invio', label: Text('Invio documento'), icon: Icon(LucideIcons.upload)),
-                  ButtonSegment(value: 'presa_visione', label: Text('Presa visione'), icon: Icon(LucideIcons.eye)),
+                showSelectedIcon: MediaQuery.sizeOf(context).width >= 769,
+                segments: [
+                  ButtonSegment(value: 'firma', label: const Text('Firma'), icon: MediaQuery.sizeOf(context).width >= 769 ? const Icon(LucideIcons.pen_line) : null),
+                  ButtonSegment(value: 'invio', label: const Text('Documento'), tooltip: 'Invio di un documento', icon: MediaQuery.sizeOf(context).width >= 769 ? const Icon(LucideIcons.upload) : null),
+                  ButtonSegment(value: 'presa_visione', label: const Text('Presa visione'), icon: MediaQuery.sizeOf(context).width >= 769 ? const Icon(LucideIcons.eye) : null),
                 ],
                 selected: {tipo},
                 onSelectionChanged: (s) => setState(() => tipo = s.first),

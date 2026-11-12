@@ -173,7 +173,7 @@ class _PortaleTenantScreenState extends State<PortaleTenantScreen> {
           Testo.bodyMedium('Trovati: $totale', fontWeight: FontWeight.w500),
         ])),
         SizedBox(height: 16),
-        listaCarta(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        listaPannelloFiltri(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 12, runSpacing: 12, children: [
             listaFiltroTesto(nome, 'Nome', _cerca),
             listaFiltroTesto(membro, 'Membro (email o nome)', _cerca),

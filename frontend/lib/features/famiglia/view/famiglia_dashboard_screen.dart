@@ -15,6 +15,7 @@ import 'package:cartellaviva/features/documenti/view/documenti_screen.dart' show
 import 'package:cartellaviva/layout/layout.dart';
 import 'package:cartellaviva/features/scadenze/view/prossime_scadenze_card.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenze_proposte.dart';
+import 'package:cartellaviva/features/pratiche/view/da_fare_card.dart';
 
 /// Home della famiglia: azioni rapide, prossime scadenze, ultimi documenti.
 class FamigliaDashboardScreen extends StatefulWidget {
@@ -55,6 +56,10 @@ class _FamigliaDashboardScreenState extends State<FamigliaDashboardScreen> {
           SizedBox(height: 4),
           Padding(padding: EdgeInsets.symmetric(horizontal: spazioPagina), child: Testo.bodySmall(s.currentMembership?.tenantName ?? '', tenue: true)),
           SizedBox(height: spazioPagina),
+          if (s.can('scadenza:manage', resourceOwnerId: s.me?.id) || s.can('pagamento:read')) ...[
+            Padding(padding: EdgeInsets.symmetric(horizontal: spazioPagina), child: const DaFareCard()),
+            SizedBox(height: spazioPagina),
+          ],
           Padding(padding: EdgeInsets.symmetric(horizontal: spazioPagina), child: _azioni(s)),
           if (s.currentMembership?.isOwner == true || s.currentMembership?.roleSlug == 'member') ...[
             SizedBox(height: spazioPagina),

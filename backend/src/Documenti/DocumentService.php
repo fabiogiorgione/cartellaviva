@@ -263,6 +263,35 @@ class DocumentService
     }
 
     /**
+     * Avviso di pagamento proposto dal testo: JSON, cifrato con la chiave del
+     * documento se il documento è cifrato (è un dato estratto dal contenuto).
+     *
+     * @param array<string, mixed> $proposta
+     */
+    public function storePagamentoProposta(Documento $documento, array $proposta): void
+    {
+        $json = json_encode($proposta, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        $documento->setPagamentoPropostaRaw($documento->isCifrato()
+            ? 'enc:'.base64_encode($this->cipher->encryptContent($json, $this->dek($documento), $documento->getId(), 'pagamento'))
+            : $json);
+    }
+
+    /** @return array<string, mixed>|null solo se ancora da decidere */
+    public function readPagamentoProposta(Documento $documento): ?array
+    {
+        $raw = $documento->getPagamentoPropostaRaw();
+        if (null === $raw || Documento::PROPOSTA_APERTA !== $documento->getPagamentoPropostaStato()) {
+            return null;
+        }
+        if (str_starts_with($raw, 'enc:')) {
+            $raw = $this->cipher->decryptContent((string) base64_decode(substr($raw, 4), true), $this->dek($documento), $documento->getId(), 'pagamento');
+        }
+        $data = json_decode($raw, true);
+
+        return \is_array($data) ? $data : null;
+    }
+
+    /**
      * Cambio di categoria. Verso una categoria sensibile il documento viene cifrato
      * (file e testo OCR). Verso una non sensibile resta cifrato: la cifratura non si
      * rimuove mai in automatico.
@@ -349,6 +378,7 @@ class DocumentService
         $contents = $this->storage->read($oldKey);
         $plainOcr = $documento->getOcrText();
         $proposta = $this->readScadenzaProposta($documento);
+        $propostaPagamento = $this->readPagamentoProposta($documento);
         // La copia per l'anteprima (in chiaro finora) va cifrata con la nuova chiave.
         $anteprima = AnteprimaStato::PRONTA === $documento->getAnteprimaStato() ? $this->readAnteprima($documento) : null;
         $vecchiaAnteprima = $documento->getAnteprimaKey();
@@ -363,6 +393,9 @@ class DocumentService
         }
         if (null !== $proposta) {
             $this->storeScadenzaProposta($documento, $proposta);
+        }
+        if (null !== $propostaPagamento) {
+            $this->storePagamentoProposta($documento, $propostaPagamento);
         }
         if (null !== $anteprima) {
             $this->storeAnteprima($documento, $anteprima[0], $anteprima[1]);

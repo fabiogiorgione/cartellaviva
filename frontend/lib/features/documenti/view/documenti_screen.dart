@@ -27,12 +27,15 @@ import 'package:cartellaviva/features/documenti/view/proposta_categorie_wizard.d
 import 'package:cartellaviva/features/documenti/view/vista_gruppi.dart';
 import 'package:cartellaviva/features/documenti/model/proposte_categoria.dart';
 import 'package:cartellaviva/layout/layout.dart';
+import 'package:cartellaviva/widgets/foglio.dart';
+import 'package:cartellaviva/widgets/telefono/paginazione_telefono.dart';
 import 'package:cartellaviva/widgets/lista_crud.dart';
 import 'package:cartellaviva/widgets/conferma.dart';
 import 'package:cartellaviva/widgets/messaggio.dart';
 
 part 'documenti_gruppo.dart';
 part 'documenti_righe.dart';
+part 'documenti_telefono.dart';
 
 /// Colore "#RRGGBB" delle categorie.
 Color hexColor(String hex, {Color fallback = Colors.blueGrey}) {
@@ -69,7 +72,10 @@ class _DocumentiScreenState extends State<DocumentiScreen> {
   final TextEditingController searchField = TextEditingController();
   bool dragging = false;
   String? azioneGruppo;
-  bool pannelloAperto = true;
+  /// Colonna dei filtri su schermo largo: aperta da sola solo se c'è spazio per la tabella.
+  bool? pannelloScelto;
+  bool get pannelloAperto => pannelloScelto ?? MediaQuery.of(context).size.width >= 1300;
+  bool selezioneTelefono = false;
 
   SessionService get session => SessionService.to;
 
@@ -179,7 +185,7 @@ class _DocumentiScreenState extends State<DocumentiScreen> {
     return Layout(
       child: GetBuilder<DocumentiController>(
         init: controller,
-        builder: (c) => DropTarget(
+        builder: (c) => _telefono ? _paginaTelefono(c) : DropTarget(
           enable: c.canUpload,
           onDragEntered: (_) => setState(() => dragging = true),
           onDragExited: (_) => setState(() => dragging = false),
@@ -271,7 +277,7 @@ class _DocumentiScreenState extends State<DocumentiScreen> {
           listaFiltroScelta('Raggruppa per', c.raggruppaPer.name, [for (final d in DimensioneFiltro.raggruppabili) (d.name, d.titolo)],
               (v) => c.raggruppaSecondo(DimensioneFiltro.values.byName(v!))),
         OutlinedButton(
-          onPressed: () => _stretto ? _apriFoglioFiltri(c) : setState(() => pannelloAperto = !pannelloAperto),
+          onPressed: () => _stretto ? _apriFoglioFiltri(c) : setState(() => pannelloScelto = !pannelloAperto),
           child: Text(c.filtri.isEmpty ? 'Filtri' : 'Filtri (${c.filtri.length})'),
         ),
         OutlinedButton.icon(
@@ -291,13 +297,29 @@ class _DocumentiScreenState extends State<DocumentiScreen> {
 
   Widget _pannello(DocumentiController c) => PannelloFiltri(voci: c.vociDi, scelto: (d) => c.filtri[d], onScegli: c.scegliFiltro);
 
-  Future<void> _apriFoglioFiltri(DocumentiController c) => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => GetBuilder<DocumentiController>(
+  Future<void> _apriFoglioFiltri(DocumentiController c) => apriFoglio<void>(
+        context,
+        titolo: 'Filtri',
+        contenuto: (_) => GetBuilder<DocumentiController>(init: c, builder: _pannello),
+        azione: (ctx) => GetBuilder<DocumentiController>(
           init: c,
-          builder: (c) => SafeArea(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(12, 0, 12, 16), child: _pannello(c))),
+          builder: (c) => Row(children: [
+            if (c.filtri.isNotEmpty) ...[
+              OutlinedButton(onPressed: () {
+                  c.filtri.clear();
+                  c.selezionati.clear();
+                  c.pagina = 1;
+                  c.load();
+                }, child: const Text('Resetta')),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(c.loading ? 'Mostra i documenti' : (c.totale == 1 ? 'Mostra 1 documento' : 'Mostra ${c.totale} documenti')),
+              ),
+            ),
+          ]),
         ),
       );
 
@@ -351,6 +373,7 @@ class _DocumentiScreenState extends State<DocumentiScreen> {
         guida: 'primi-passi-famiglia',
       );
     }
+    if (_telefono) return _corpoTelefono(c);
     final stretto = _stretto;
     final azioni = _azioniGruppo;
     return listaCarta(

@@ -98,6 +98,7 @@ class _EnteRichiestaScreenState extends State<EnteRichiestaScreen> {
   @override
   Widget build(BuildContext context) {
     return PaginaEnte(
+      indietro: '/ente/richieste',
       titolo: 'Richiesta',
       sezione: 'Avanzamento',
       child: FutureBuilder<RichiestaEnte>(

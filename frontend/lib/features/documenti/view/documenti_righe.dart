@@ -20,7 +20,8 @@ extension _RigheDocumenti on _DocumentiScreenState {
         colonne: [
           const ListaColonna('Titolo', flex: 5, ordina: 'titolo'),
           const ListaColonna('Categoria', flex: 3),
-          const ListaColonna('Riguarda', flex: 3),
+          // Nella vista compatta "Riguarda" lascia spazio a data e azioni (si vede nel dettaglio).
+          if (!compatta) const ListaColonna('Riguarda', flex: 3),
           const ListaColonna('Data', flex: 2, ordina: 'data'),
           if (!compatta) const ListaColonna('Caricato', flex: 2, ordina: 'creato'),
           if (!compatta) const ListaColonna('Protezione e testo', flex: 3),
@@ -42,8 +43,8 @@ extension _RigheDocumenti on _DocumentiScreenState {
               ]),
             ),
             _categoria(d),
-            Text(d.membri.isEmpty ? 'Tutta la famiglia' : d.membri.map((m) => m.nome).join(', '), overflow: TextOverflow.ellipsis, maxLines: 2),
-            Text(d.dataDocumento == null ? '—' : formatDataBreve(d.dataDocumento!)),
+            if (!compatta) Text(d.membri.isEmpty ? 'Tutta la famiglia' : d.membri.map((m) => m.nome).join(', '), overflow: TextOverflow.ellipsis, maxLines: 2),
+            Text(d.dataDocumento == null ? '—' : formatDataBreve(d.dataDocumento!), maxLines: 1, softWrap: false, overflow: TextOverflow.fade),
             if (!compatta) Text(d.createdAt == null ? '—' : formatDataBreve(d.createdAt!.toLocal())),
             if (!compatta)
               Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -83,11 +84,16 @@ extension _RigheDocumenti on _DocumentiScreenState {
         elevation: 0,
         shape: RoundedRectangleBorder(side: BorderSide(color: Theme.of(context).dividerColor), borderRadius: BorderRadius.circular(8)),
         child: InkWell(
-          onTap: () => Get.toNamed('/documento/${d.id}'),
+          onTap: _telefono && selezioneTelefono && _azioniGruppo.isNotEmpty
+              ? () {
+                  c.selezionati.contains(d.id) ? c.selezionati.remove(d.id) : c.selezionati.add(d.id);
+                  c.cambiaSelezione();
+                }
+              : () => Get.toNamed('/documento/${d.id}'),
           child: Padding(
             padding: EdgeInsets.fromLTRB(4, 8, 4, 8),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (_azioniGruppo.isNotEmpty)
+              if (_azioniGruppo.isNotEmpty && (!_telefono || selezioneTelefono))
                 Checkbox(
                   value: c.selezionati.contains(d.id),
                   onChanged: (v) {

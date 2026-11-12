@@ -48,6 +48,11 @@ doctrine:
                 is_bundle: false
                 dir: '%kernel.project_dir%/src/Scadenze/Entity'
                 prefix: 'App\Scadenze\Entity'
+            Pratiche:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Pratiche/Entity'
+                prefix: 'App\Pratiche\Entity'
             Documenti:
                 type: attribute
                 is_bundle: false

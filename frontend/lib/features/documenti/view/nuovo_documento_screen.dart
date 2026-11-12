@@ -49,7 +49,7 @@ class _NuovoDocumentoScreenState extends State<NuovoDocumentoScreen> {
                   children: [
                     Flexible(child: Testo.titleMedium(richiestaId == null ? 'Nuovo documento' : 'Scansiona la risposta', fontSize: 18, fontWeight: FontWeight.w500)),
                     Briciole(voci: [
-                      richiestaId == null ? Briciola(nome: 'Documenti') : Briciola(nome: 'Richieste', rotta: '/richieste'),
+                      richiestaId == null ? Briciola(nome: 'Documenti', rotta: '/documenti') : Briciola(nome: 'Richieste', rotta: '/richieste'),
                       Briciola(nome: 'Scansione', attiva: true),
                     ]),
                   ],

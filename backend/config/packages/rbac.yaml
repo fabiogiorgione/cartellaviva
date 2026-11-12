@@ -24,6 +24,18 @@ parameters:
         scadenze_proprie:
             name: 'Scadenze: gestione delle proprie'
             permissions: ['scadenza:manage:own']
+        pagamenti_lettura:
+            name: 'Pagamenti: lettura'
+            permissions: ['pagamento:read']
+        pagamenti_propri:
+            name: 'Pagamenti: gestione dei propri'
+            permissions: ['pagamento:manage:own']
+        pratiche_lettura:
+            name: 'Pratiche (730, ISEE): lettura'
+            permissions: ['pratica:read']
+        pratiche_proprie:
+            name: 'Pratiche (730, ISEE): gestione delle proprie'
+            permissions: ['pratica:manage:own']
         membri_lettura:
             name: 'Membri: elenco'
             permissions: ['membro:read', 'tenant:read']
@@ -61,17 +73,17 @@ parameters:
             name: Membro
             description: Legge tutti i dati del tenant, modifica ed elimina solo quelli che ha caricato.
             tenant_type: ~
-            permission_groups: [documenti_lettura, documenti_propri, condivisioni_proprie, scadenze_lettura, scadenze_proprie, membri_lettura, famiglia_gestione, richieste_risposta]
+            permission_groups: [documenti_lettura, documenti_propri, condivisioni_proprie, scadenze_lettura, scadenze_proprie, pagamenti_lettura, pagamenti_propri, pratiche_lettura, pratiche_proprie, membri_lettura, famiglia_gestione, richieste_risposta]
         viewer:
             name: Lettore
             description: Sola lettura (es. un nonno che vede ma non modifica).
             tenant_type: ~
-            permission_groups: [documenti_lettura, scadenze_lettura, membri_lettura, famiglia_lettura, richieste_lettura]
+            permission_groups: [documenti_lettura, scadenze_lettura, pagamenti_lettura, pratiche_lettura, membri_lettura, famiglia_lettura, richieste_lettura]
         emergenza:
             name: Contatto d'emergenza
             description: 'Accesso in sola lettura concesso dopo l''attesa senza opposizione; si revoca in ogni momento.'
             tenant_type: privato
-            permissions: ['documento:read', 'scadenza:read', 'membro_famiglia:read', 'tenant:read']
+            permissions: ['documento:read', 'scadenza:read', 'pagamento:read', 'pratica:read', 'membro_famiglia:read', 'tenant:read']
         segreteria:
             name: Segreteria
             description: Gestisce iscritti, gruppi, operatori e richieste di tutto l'ente.

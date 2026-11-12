@@ -11,6 +11,9 @@ import 'package:cartellaviva/app_constant.dart';
 import 'package:cartellaviva/features/famiglia/controller/tenant_members_controller.dart';
 import 'package:cartellaviva/features/famiglia/model/tenant_member.dart';
 import 'package:cartellaviva/layout/layout.dart';
+import 'package:cartellaviva/widgets/foglio.dart';
+
+part 'tenant_members_telefono.dart';
 
 /// "Gestione tenant e membri": chi fa parte del tenant, ruoli, sospensioni,
 /// rimozioni e inviti via email.
@@ -114,6 +117,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
   // ---- Membri ---------------------------------------------------------------
 
   Widget membersCard() {
+    if (MediaQuery.of(context).size.width < larghezzaTelefono) return membriTelefono();
     return Scheda(elevazione: .7, paddingAll: 20, child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

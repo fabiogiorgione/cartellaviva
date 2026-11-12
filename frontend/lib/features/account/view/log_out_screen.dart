@@ -30,11 +30,14 @@ class _LogOutScreenState extends State<LogOutScreen> {
       builder: (controller) {
       return Padding(
         padding: EdgeInsets.all(20),
+        // Colonna a misura del contenuto con spazi fissi: con spaceBetween e
+        // senza altezza il logo finiva sopra il titolo.
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Riquadro(paddingAll: 0, height: 28, child: const LogoCartellaViva(altezza: 28)),
+            SizedBox(height: 32),
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -47,6 +50,7 @@ class _LogOutScreenState extends State<LogOutScreen> {
                 ],
               ),
             ),
+            SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

@@ -11,6 +11,10 @@ class RoutesName {
   final analisiDocumenti = '/documenti/analisi';
   final benvenuto = '/benvenuto';
   final scadenze = '/scadenze';
+  final daConfermare = '/da-confermare';
+  final pratiche = '/pratiche';
+  final pagamenti = '/pratiche/pagamenti';
+  final pratica = '/pratiche/pratica';
   final documenti = '/documenti';
   final categorie = '/categorie';
   final famigliaImpostazioni = '/famiglia/impostazioni';

@@ -20,6 +20,8 @@ framework:
             # Se Ollama non risponde il messaggio viene ritentato (retry_strategy) e poi finisce in "failed".
             'App\Documenti\Message\ClassificaDocumentoMessage': async
             'App\Scadenze\Message\ProponiScadenzaMessage': async
+            'App\Pratiche\Message\ProponiPagamentoMessage': async
+            'App\Pratiche\Message\AnalizzaDocumentoPraticaMessage': async
             'App\Documenti\Message\IndicizzaDocumentoMessage': async
             'App\Account\Message\InviaPushMessage': async
 

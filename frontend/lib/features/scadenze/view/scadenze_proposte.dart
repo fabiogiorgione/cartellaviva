@@ -9,6 +9,8 @@ import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/features/documenti/model/documento.dart';
 import 'package:cartellaviva/features/scadenze/model/scadenza.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenza_form.dart';
+import 'package:cartellaviva/features/scadenze/view/proposta_telefono.dart';
+import 'package:cartellaviva/layout/layout.dart' show larghezzaTelefono;
 
 /// Conferma di una scadenza trovata in un documento: apre il modulo già
 /// compilato (titolo, data, documento, persona, categoria, promemoria a 30
@@ -55,6 +57,18 @@ class PropostaTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = proposta;
+    if (MediaQuery.of(context).size.width < larghezzaTelefono) {
+      return PropostaTelefono(
+        proposta: p,
+        mostraDocumento: mostraDocumento,
+        onIgnora: () async {
+          if (await ignoraProposta(p)) onDecisa();
+        },
+        onCrea: () async {
+          if (await confermaProposta(context, p)) onDecisa();
+        },
+      );
+    }
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(LucideIcons.calendar_search),
@@ -92,6 +106,7 @@ class ScadenzeProposteCard extends StatefulWidget {
 
 class _ScadenzeProposteCardState extends State<ScadenzeProposteCard> {
   List<ScadenzaProposta> proposte = const [];
+  bool tutte = false;
 
   @override
   void initState() {
@@ -118,7 +133,7 @@ class _ScadenzeProposteCardState extends State<ScadenzeProposteCard> {
       child: Scheda(paddingAll: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Testo.titleSmall('Scadenze trovate nei documenti', fontWeight: FontWeight.w600),
           Testo.bodySmall('Le abbiamo lette dal testo dei documenti: diventano scadenze solo se le confermi.', tenue: true),
-          for (final p in proposte)
+          for (final p in (MediaQuery.of(context).size.width < larghezzaTelefono && !tutte ? proposte.take(3) : proposte))
             PropostaTile(
               proposta: p,
               onDecisa: () {
@@ -126,6 +141,8 @@ class _ScadenzeProposteCardState extends State<ScadenzeProposteCard> {
                 widget.onCambiate?.call();
               },
             ),
+          if (MediaQuery.of(context).size.width < larghezzaTelefono && !tutte && proposte.length > 3)
+            TextButton(onPressed: () => setState(() => tutte = true), child: Text('Mostra tutte (${proposte.length})')),
         ])),
     );
   }

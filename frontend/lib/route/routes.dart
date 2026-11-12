@@ -45,6 +45,10 @@ import 'package:cartellaviva/features/ente/view/registro_ente_screen.dart';
 import 'package:cartellaviva/features/ente/view/ente_modelli_screen.dart';
 import 'package:cartellaviva/features/documenti/view/nuovo_documento_screen.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenze_screen.dart';
+import 'package:cartellaviva/features/pratiche/view/da_confermare_screen.dart';
+import 'package:cartellaviva/features/pratiche/view/pagamenti_screen.dart';
+import 'package:cartellaviva/features/pratiche/view/pratica_screen.dart';
+import 'package:cartellaviva/features/pratiche/view/pratiche_screen.dart';
 import 'package:cartellaviva/features/famiglia/view/benvenuto_screen.dart';
 import 'package:cartellaviva/features/ente/view/ente_home_screen.dart';
 import 'package:cartellaviva/features/famiglia/view/tenant_members_screen.dart';
@@ -133,6 +137,10 @@ List<GetPage> getPageRoute() => [
       _authMiddleware(route.analisiDocumenti, () => const AnalisiDocumentiScreen()),
       _authMiddleware(route.benvenuto, () => BenvenutoScreen()),
       _authMiddleware(route.scadenze, () => ScadenzeScreen()),
+      _authMiddleware(route.daConfermare, () => const DaConfermareScreen()),
+      _authMiddleware(route.pratiche, () => const PraticheScreen()),
+      _authMiddleware(route.pagamenti, () => const PagamentiScreen()),
+      _authMiddleware(route.pratica, () => const PraticaScreen()),
       _authMiddleware(route.documenti, () => DocumentiScreen()),
       _authMiddleware(route.categorie, () => const CategorieScreen()),
       _authMiddleware(route.famigliaImpostazioni, () => FamigliaImpostazioniScreen()),

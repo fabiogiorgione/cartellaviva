@@ -67,6 +67,11 @@ final class ScadenzaController extends AbstractController
             if (!$this->access->isGranted('documento:read', $d) || null === ($p = $this->documents->readScadenzaProposta($d))) {
                 continue;
             }
+            // Un avviso di pagamento da confermare copre già la sua scadenza (confermandolo
+            // nasce il promemoria): non la si propone due volte nella coda "Da confermare".
+            if (Documento::PROPOSTA_APERTA === $d->getPagamentoPropostaStato()) {
+                continue;
+            }
             $righe[] = self::proposta($d, $p);
         }
         usort($righe, static fn ($a, $b) => $a['data'] <=> $b['data']);

@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:get/get.dart';
+import 'package:cartellaviva/features/pratiche/controller/da_confermare_service.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/helpers/services/url_service.dart';
 import 'package:cartellaviva/helpers/theme/tema_app.dart';
+import 'package:cartellaviva/helpers/services/offline/offline_store.dart';
+import 'package:cartellaviva/layout/navigazione.dart';
 import 'package:cartellaviva/layout/tenant_switcher.dart';
 import 'package:cartellaviva/route/route_method.dart';
 import 'package:cartellaviva/widgets/testo.dart';
+
+/// Voce del menu a cui appartiene la pagina corrente: un dettaglio conta come
+/// la sua lista (un documento è sotto "Documenti").
+String rottaDelMenu() {
+  final url = UrlService.getCurrentUrl();
+  const sotto = {'/documento/': '/documenti', '/import/': '/documenti', '/richieste/': '/richieste', '/aiuto/': '/aiuto', '/ente/richieste/': '/ente/richieste'};
+  for (final e in sotto.entries) {
+    if (url.startsWith(e.key)) return e.value;
+  }
+  return url;
+}
 
 /// Menu dell'app a sinistra. [compatta]: solo le icone (larga 60 invece di 240).
 class BarraLaterale extends StatelessWidget {
@@ -29,9 +43,6 @@ class BarraLaterale extends StatelessWidget {
             SizedBox(height: compatta ? 20 : 12),
             if (!compatta) const TenantSwitcher(),
             GetBuilder<SessionService>(builder: (session) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: _voci(session))),
-            _sezione(context, 'Account'),
-            _voce(LucideIcons.id_card, 'Dati anagrafici', route.accountProfile),
-            _voce(LucideIcons.shield_check, 'Sicurezza', route.accountSecurity),
             const SizedBox(height: 32),
           ]),
         ),
@@ -42,7 +53,7 @@ class BarraLaterale extends StatelessWidget {
   Widget _voce(IconData icona, String titolo, String rotta) => VoceMenu(icona: icona, titolo: titolo, rotta: rotta, compatta: compatta);
 
   Widget _sezione(BuildContext context, String titolo) => compatta
-      ? const SizedBox.shrink()
+      ? Padding(padding: const EdgeInsets.fromLTRB(14, 2, 14, 8), child: Divider(height: 1, color: context.colori.barraEtichetta.withAlpha(90)))
       : Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Testo.labelSmall(titolo.toUpperCase(), color: context.colori.barraEtichetta, tenue: true, maxLines: 1, overflow: TextOverflow.clip, fontWeight: FontWeight.w500),
@@ -91,20 +102,38 @@ class BarraLaterale extends StatelessWidget {
       ];
     }
     return [
-      sezione('Principale'),
-      _voce(LucideIcons.layout_dashboard, 'Dashboard', route.dashboard),
+      _voce(LucideIcons.house, 'Home', route.dashboard),
+      sezione('Archivio'),
       if (session.can('documento:read'))
         GruppoMenu(icona: LucideIcons.files, titolo: 'Documenti', compatta: compatta, voci: [
           (titolo: 'Tutti i documenti', rotta: route.documenti),
           (titolo: 'Categorie', rotta: route.categorie),
+          (titolo: 'Analisi AI', rotta: route.analisiDocumenti),
         ]),
-      if (session.can('documento:create')) _voce(LucideIcons.scan_line, 'Scansiona', route.nuovoDocumento),
+      if (session.can('documento:create')) _voce(LucideIcons.scan_line, 'Scansiona o carica', route.nuovoDocumento),
+      if (OfflineStore.supportato) _voce(LucideIcons.smartphone, 'Documenti offline', '/offline'),
+      if (session.can('condivisione:manage', resourceOwnerId: me?.id)) _voce(LucideIcons.share_2, 'Condivisioni esterne', '/condivisioni'),
+      sezione('Da sbrigare'),
+      if (session.can('scadenza:manage', resourceOwnerId: me?.id) || session.can('pagamento:manage'))
+        GetBuilder<DaConfermareService>(
+          init: DaConfermareService.to,
+          builder: (s) => VoceMenu(icona: LucideIcons.sparkles, titolo: 'Da confermare', rotta: route.daConfermare, compatta: compatta, contatore: s.totale),
+        ),
       if (session.can('scadenza:read')) _voce(LucideIcons.calendar_clock, 'Scadenze', route.scadenze),
-      if (session.can('richiesta:read')) _voce(LucideIcons.inbox, 'Richieste', route.richieste),
-      ...portale,
+      if (session.can('pagamento:read'))
+        GruppoMenu(icona: LucideIcons.folder_open, titolo: 'Pratiche', compatta: compatta, voci: [
+          (titolo: 'Panoramica', rotta: route.pratiche),
+          (titolo: 'Pagamenti', rotta: route.pagamenti),
+        ]),
+      if (session.can('richiesta:read')) _voce(LucideIcons.inbox, 'Richieste dagli enti', route.richieste),
       sezione('Famiglia'),
       if (session.can('membro:read')) _voce(LucideIcons.users, 'Membri e accessi', route.tenantMembers),
       if (session.can('membro_famiglia:read') || membership.isOwner) _voce(LucideIcons.settings, 'Impostazioni famiglia', route.famigliaImpostazioni),
+      _voce(LucideIcons.life_buoy, "Contatto d'emergenza", '/emergenza'),
+      ...portale,
+      sezione('Aiuto'),
+      _voce(LucideIcons.circle_question_mark, 'Aiuto e guide', '/aiuto'),
+      _voce(LucideIcons.lightbulb, "Suggerisci un'idea", '/idee'),
     ];
   }
 }
@@ -153,23 +182,32 @@ class VoceMenu extends StatelessWidget {
   final String rotta;
   final bool compatta;
 
-  const VoceMenu({super.key, required this.icona, required this.titolo, required this.rotta, this.compatta = false});
+  /// Numero in un piccolo tondo accanto al titolo (es. proposte da confermare); nascosto se 0.
+  final int contatore;
+
+  const VoceMenu({super.key, required this.icona, required this.titolo, required this.rotta, this.compatta = false, this.contatore = 0});
 
   @override
   Widget build(BuildContext context) {
     final riga = _Riga(
-      attiva: UrlService.getCurrentUrl() == rotta,
-      onTap: () => Get.toNamed(rotta),
+      attiva: rottaDelMenu() == rotta,
+      onTap: () => _apri(context, rotta),
       padding: compatta ? const EdgeInsets.symmetric(vertical: 10) : const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       contenuto: (colore) => compatta
-          ? Center(child: Icon(icona, size: 20, color: colore))
+          ? Center(
+              child: Stack(clipBehavior: Clip.none, children: [
+                Icon(icona, size: 20, color: colore),
+                if (contatore > 0) Positioned(right: -4, top: -3, child: Container(width: 9, height: 9, decoration: BoxDecoration(color: context.colori.danger, shape: BoxShape.circle))),
+              ]),
+            )
           : Row(children: [
               Icon(icona, size: 20, color: colore),
               const SizedBox(width: 16),
               Expanded(child: Testo.titleSmall(titolo, fontWeight: FontWeight.w400, color: colore, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis)),
+              if (contatore > 0) _Contatore(contatore),
             ]),
     );
-    return compatta ? Tooltip(message: titolo, child: riga) : riga;
+    return compatta ? Tooltip(message: contatore > 0 ? '$titolo ($contatore)' : titolo, child: riga) : riga;
   }
 }
 
@@ -188,18 +226,18 @@ class GruppoMenu extends StatefulWidget {
 }
 
 class _GruppoMenuState extends State<GruppoMenu> {
-  late bool aperto = widget.voci.any((v) => v.rotta == UrlService.getCurrentUrl());
+  late bool aperto = widget.voci.any((v) => v.rotta == rottaDelMenu());
 
   @override
   Widget build(BuildContext context) {
     final colori = context.colori;
-    final attivo = widget.voci.any((v) => v.rotta == UrlService.getCurrentUrl());
+    final attivo = widget.voci.any((v) => v.rotta == rottaDelMenu());
     if (widget.compatta) {
       return PopupMenuButton<String>(
         tooltip: widget.titolo,
         position: PopupMenuPosition.over,
         offset: const Offset(60, 0),
-        onSelected: Get.toNamed,
+        onSelected: apriDalMenu,
         itemBuilder: (_) => [for (final v in widget.voci) PopupMenuItem(value: v.rotta, child: Text(v.titolo))],
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -234,8 +272,8 @@ class SottoVoceMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Riga(
-        attiva: UrlService.getCurrentUrl() == rotta,
-        onTap: () => Get.toNamed(rotta),
+        attiva: rottaDelMenu() == rotta,
+        onTap: () => _apri(context, rotta),
         padding: const EdgeInsets.only(left: 48, right: 16, top: 8, bottom: 8),
         contenuto: (colore) => Row(children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: colore, shape: BoxShape.circle)),
@@ -243,5 +281,27 @@ class SottoVoceMenu extends StatelessWidget {
           // Una riga sola: andando a capo si vedrebbe solo la prima parte ("Tutti i").
           Expanded(child: Testo.titleSmall(titolo, fontWeight: FontWeight.w400, color: colore, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis)),
         ]),
+      );
+}
+
+/// Apre una voce del menu: chiude il cassetto (sul telefono) e apre la pagina
+/// di primo livello, vedi [apriDalMenu].
+void _apri(BuildContext context, String rotta) {
+  Scaffold.maybeOf(context)?.closeDrawer();
+  apriDalMenu(rotta);
+}
+
+/// Numero piccolo in un tondo, accanto a una voce del menu.
+class _Contatore extends StatelessWidget {
+  final int numero;
+
+  const _Contatore(this.numero);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(minWidth: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(color: context.colori.danger, borderRadius: BorderRadius.circular(10)),
+        child: Text(numero > 99 ? '99+' : '$numero', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600, height: 1.3)),
       );
 }

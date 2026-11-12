@@ -57,6 +57,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Solo per guidare l'app nei test di navigazione (flutter run -t test_driver/app.dart).
+  flutter_driver:
+    sdk: flutter
 
   flutter_lints: ^6.0.0
 

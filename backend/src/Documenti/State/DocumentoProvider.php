@@ -12,9 +12,13 @@ use App\Documenti\DocumentService;
 use App\Documenti\Indice\IndiceDocumenti;
 use App\Documenti\Indice\RicercaPerSignificato;
 use App\Documenti\Repository\DocumentoRepository;
+use App\Pratiche\Controller\PagamentoController;
+use App\Pratiche\Entity\Pagamento;
+use App\Pratiche\Repository\PagamentoRepository;
 use App\Scadenze\Controller\ScadenzaController;
 use App\Shared\State\TotaleRisultatiListener;
 use App\Tenancy\Repository\TenantRepository;
+use App\Tenancy\Security\PermissionResolver;
 use App\Tenancy\Security\TenantAccess;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -39,6 +43,8 @@ final class DocumentoProvider implements ProviderInterface
         private readonly FiltriElenco $filtriElenco,
         private readonly RicercaPerSignificato $ricerca,
         private readonly IndiceDocumenti $indice,
+        private readonly PagamentoRepository $pagamenti,
+        private readonly PermissionResolver $resolver,
     ) {
     }
 
@@ -78,6 +84,17 @@ final class DocumentoProvider implements ProviderInterface
             $resource = DocumentoResource::fromEntity($documento, $this->documents->readOcrText($documento));
             $proposta = $this->documents->readScadenzaProposta($documento);
             $resource->scadenzaProposta = null !== $proposta ? ScadenzaController::proposta($documento, $proposta) : null;
+            // Permessi letti dal ruolo, senza passare dal voter: un lettore non deve riempire l'audit di rifiuti.
+            $codici = $this->resolver->getPermissionCodes($this->access->currentUser(), $tenant);
+            if (\in_array('pagamento:read', $codici, true)) {
+                $resource->pagamenti = array_map(static fn (Pagamento $p) => [
+                    'id' => (string) $p->getId(), 'titolo' => $p->getTitolo(), 'stato' => $p->getStato()->value,
+                    'ruolo' => $p->getRicevuta()?->getId()->equals($documento->getId()) ? 'ricevuta' : 'avviso',
+                ], $this->pagamenti->perDocumento($documento));
+                $proposta = array_intersect(['pagamento:manage:own', 'pagamento:manage:all'], $codici) !== []
+                    ? $this->documents->readPagamentoProposta($documento) : null;
+                $resource->pagamentoProposta = null !== $proposta ? PagamentoController::proposta($documento, $proposta) : null;
+            }
             $resource->indice = $documento->isCifrato() ? null : $this->indice->leggi($documento);
 
             return $resource;

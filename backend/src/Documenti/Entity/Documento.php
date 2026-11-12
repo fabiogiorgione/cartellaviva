@@ -165,6 +165,18 @@ class Documento implements OwnedResourceInterface
     /** aperta | accettata | ignorata; null = nessuna proposta. Non rivela la data. */
     #[ORM\Column(length: 10, nullable: true)]
     private ?string $scadenzaPropostaStato = null;
+
+    /**
+     * Avviso di pagamento trovato nel testo (JSON): estratto dal contenuto,
+     * quindi cifrato come il testo OCR se il documento è cifrato
+     * (DocumentService::storePagamentoProposta).
+     */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $pagamentoProposta = null;
+
+    /** aperta | accettata | ignorata; null = nessuna proposta. Non rivela i dati. */
+    #[ORM\Column(length: 10, nullable: true)]
+    private ?string $pagamentoPropostaStato = null;
     public function __construct(Uuid $id, Tenant $tenant, User $owner, Categoria $categoria, string $titolo, string $nomeFileOriginale)
     {
         $this->id = $id;
@@ -340,6 +352,32 @@ class Documento implements OwnedResourceInterface
         if (self::PROPOSTA_APERTA === $this->scadenzaPropostaStato) {
             $this->scadenzaPropostaStato = $esito;
             $this->scadenzaProposta = null;
+        }
+    }
+
+    public function getPagamentoPropostaRaw(): ?string
+    {
+        return $this->pagamentoProposta;
+    }
+
+    public function getPagamentoPropostaStato(): ?string
+    {
+        return $this->pagamentoPropostaStato;
+    }
+
+    /** Nuova proposta (anche su una già decisa, se si rivaluta il documento): torna aperta. */
+    public function setPagamentoPropostaRaw(string $raw): void
+    {
+        $this->pagamentoProposta = $raw;
+        $this->pagamentoPropostaStato = self::PROPOSTA_APERTA;
+    }
+
+    /** Accettata (creato il pagamento) o ignorata: il dato estratto non serve più. */
+    public function chiudiPagamentoProposta(string $esito): void
+    {
+        if (self::PROPOSTA_APERTA === $this->pagamentoPropostaStato) {
+            $this->pagamentoPropostaStato = $esito;
+            $this->pagamentoProposta = null;
         }
     }
 

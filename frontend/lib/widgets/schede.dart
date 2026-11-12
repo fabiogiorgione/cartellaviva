@@ -13,8 +13,11 @@ Widget erroreCard(String messaggio, VoidCallback riprova) => Scheda(paddingAll: 
       ]));
 
 /// Numero grande con etichetta (cruscotti).
-Widget numeroCard(String etichetta, String valore, {String? nota}) => SizedBox(
-      width: 210,
+Widget numeroCard(String etichetta, String valore, {String? nota}) => Builder(builder: (context) {
+      // Sul telefono due per riga (larghe 210 ne entrava una sola, a metà schermo).
+      final schermo = MediaQuery.sizeOf(context).width;
+      return SizedBox(
+      width: schermo < 769 ? ((schermo - 56) / 2).clamp(130.0, 210.0) : 210,
       child: Scheda(paddingAll: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Testo.labelSmall(etichetta.toUpperCase(), tenue: true, fontWeight: FontWeight.w600),
           SizedBox(height: 6),
@@ -22,3 +25,4 @@ Widget numeroCard(String etichetta, String valore, {String? nota}) => SizedBox(
           if (nota != null) Testo.bodySmall(nota, tenue: true),
         ])),
     );
+    });

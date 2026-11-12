@@ -159,6 +159,7 @@ class _RichiestaScreenState extends State<RichiestaScreen> {
   @override
   Widget build(BuildContext context) {
     return Layout(
+      indietro: '/richieste',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: spazioPagina),

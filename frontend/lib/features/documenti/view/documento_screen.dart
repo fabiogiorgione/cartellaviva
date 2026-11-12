@@ -18,6 +18,7 @@ import 'package:cartellaviva/layout/layout.dart';
 import 'package:cartellaviva/features/scadenze/view/prossime_scadenze_card.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenza_form.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenze_proposte.dart';
+import 'package:cartellaviva/features/pratiche/view/documento_pagamenti.dart';
 import 'package:cartellaviva/features/documenti/view/condivisioni_screens.dart';
 import 'package:cartellaviva/features/offline/view/offline_screen.dart';
 import 'package:cartellaviva/widgets/visualizzatore_anteprima.dart';
@@ -99,6 +100,7 @@ class _DocumentoScreenState extends State<DocumentoScreen> {
   @override
   Widget build(BuildContext context) {
     return Layout(
+      indietro: '/documenti',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -126,7 +128,7 @@ class _DocumentoScreenState extends State<DocumentoScreen> {
                       Icon(LucideIcons.triangle_alert, color: context.colori.danger),
                       SizedBox(width: 12),
                       Expanded(child: Testo.bodyMedium(snapshot.error.toString())),
-                      TextButton(onPressed: () => setState(() => _documento = _load()), child: const Text('Riprova')),
+                      TextButton(onPressed: () => setState(() { _documento = _load(); }), child: const Text('Riprova')),
                     ]));
                 }
                 final d = snapshot.data!;
@@ -149,11 +151,14 @@ class _DocumentoScreenState extends State<DocumentoScreen> {
                           proposta: d.scadenzaProposta!,
                           mostraDocumento: false,
                           onDecisa: () {
-                            setState(() => _documento = _load());
+                            setState(() { _documento = _load(); });
                             _scadenzeKey.currentState?.reload();
                           },
                         )),
                     ],
+                    DocumentoPagamenti(documento: d, onCambiato: () => setState(() {
+                      _documento = _load();
+                    })),
                     SizedBox(height: 16),
                     ProssimeScadenzeCard(
                       key: _scadenzeKey,

@@ -1,3 +1,4 @@
+import 'package:cartellaviva/layout/layout.dart' show larghezzaTelefono;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -155,12 +156,22 @@ class _TabDriveState extends State<TabDrive> {
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(
-          child: Testo.bodySmall('CartellaViva legge le cartelle in sola lettura e importa i file nuovi quando premi "Sincronizza". Un file già importato non viene ricopiato.', tenue: true),
-        ),
-        if (!session.isReadOnly) FilledButton.icon(onPressed: _aggiungi, icon: const Icon(LucideIcons.folder_plus, size: 18), label: const Text('Aggiungi cartella')),
-      ]),
+      if (MediaQuery.of(context).size.width < larghezzaTelefono)
+        // Telefono: il testo a tutta larghezza, il pulsante sotto.
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Testo.bodySmall('CartellaViva legge le cartelle in sola lettura e importa i file nuovi quando premi "Sincronizza". Un file già importato non viene ricopiato.', tenue: true),
+          if (!session.isReadOnly) ...[
+            SizedBox(height: 12),
+            FilledButton.icon(onPressed: _aggiungi, icon: const Icon(LucideIcons.folder_plus, size: 18), label: const Text('Aggiungi cartella')),
+          ],
+        ])
+      else
+        Row(children: [
+          Expanded(
+            child: Testo.bodySmall('CartellaViva legge le cartelle in sola lettura e importa i file nuovi quando premi "Sincronizza". Un file già importato non viene ricopiato.', tenue: true),
+          ),
+          if (!session.isReadOnly) FilledButton.icon(onPressed: _aggiungi, icon: const Icon(LucideIcons.folder_plus, size: 18), label: const Text('Aggiungi cartella')),
+        ]),
       SizedBox(height: 12),
       if (error != null) Testo.bodySmall(error!, color: ColoreStato.errore),
       if (sources.isEmpty && error == null) Testo.bodyMedium('Nessuna cartella collegata.'),

@@ -26,6 +26,25 @@ class ListaColonna {
 
 Widget listaCarta(Widget child, {EdgeInsets? padding}) => Scheda(paddingAll: 0, child: Padding(padding: padding ?? EdgeInsets.all(16), child: child));
 
+/// Carta dei filtri: su schermo largo sempre aperta; sul telefono chiusa sotto
+/// "Filtri", per non occupare tutta la prima schermata prima dei risultati.
+Widget listaPannelloFiltri(Widget filtri) => Builder(
+      builder: (context) => MediaQuery.sizeOf(context).width >= 769
+          ? listaCarta(filtri)
+          : Scheda(
+              paddingAll: 0,
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  leading: const Icon(LucideIcons.sliders_horizontal, size: 18),
+                  title: const Text('Filtri'),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [filtri],
+                ),
+              ),
+            ),
+    );
+
 Widget listaFiltroTesto(TextEditingController c, String label, VoidCallback onCerca) => SizedBox(
       width: 240,
       child: TextField(controller: c, onSubmitted: (_) => onCerca(), decoration: listaDecorazione(label)),
@@ -123,6 +142,9 @@ class ListaTabella extends StatelessWidget {
           child: Row(children: contenuto),
         );
 
+    // Sul telefono niente tabella che scorre di lato: ogni riga è una scheda.
+    if (MediaQuery.sizeOf(context).width < 769) return _schede(context, selezione);
+
     return LayoutBuilder(builder: (context, vincoli) {
       final larghezza = vincoli.maxWidth < larghezzaMinima ? larghezzaMinima : vincoli.maxWidth;
       return SingleChildScrollView(
@@ -184,6 +206,48 @@ class ListaTabella extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+extension on ListaTabella {
+  /// Telefono: la prima colonna è il titolo della scheda, le altre sono coppie
+  /// "colonna: valore", le colonne a destra (azioni) vanno in fondo a destra.
+  Widget _schede(BuildContext context, Set<String>? selezione) {
+    final tema = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final r in righe)
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: tema.dividerColor.withAlpha(90)))),
+          child: Builder(builder: (context) {
+            final tutte = celle(r);
+            final azioni = [for (final (j, c) in tutte.indexed) if (j > 0 && colonne[j].destra) c];
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                if (selezione != null && (selezionabile?.call(r) ?? true))
+                  Checkbox(
+                    value: selezione.contains(r['id']),
+                    onChanged: (v) {
+                      v == true ? selezione.add(r['id'] as String) : selezione.remove(r['id']);
+                      onCambiaSelezione?.call();
+                    },
+                  ),
+                Expanded(child: DefaultTextStyle.merge(style: const TextStyle(fontWeight: FontWeight.w600), child: tutte.first)),
+              ]),
+              for (final (j, c) in tutte.indexed)
+                if (j > 0 && !colonne[j].destra)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      SizedBox(width: 110, child: Testo.bodySmall(colonne[j].titolo, tenue: true)),
+                      Expanded(child: Align(alignment: Alignment.centerLeft, child: c)),
+                    ]),
+                  ),
+              if (azioni.isNotEmpty) Align(alignment: Alignment.centerRight, child: Wrap(children: azioni)),
+            ]);
+          }),
+        ),
+    ]);
   }
 }
 

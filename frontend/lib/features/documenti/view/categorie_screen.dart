@@ -14,6 +14,9 @@ import 'package:cartellaviva/layout/layout.dart';
 import 'package:cartellaviva/widgets/lista_crud.dart';
 import 'package:cartellaviva/widgets/messaggio.dart';
 import 'package:cartellaviva/helpers/theme/colore_stato.dart';
+import 'package:cartellaviva/widgets/foglio.dart';
+
+part 'categorie_telefono.dart';
 
 /// Documenti → Categorie: le predefinite (sola lettura) e quelle della famiglia,
 /// con filtri, numero di documenti e gestione (chi ha categoria:manage).
@@ -113,6 +116,7 @@ class _CategorieScreenState extends State<CategorieScreen> {
   @override
   Widget build(BuildContext context) {
     final righe = _filtrate;
+    if (MediaQuery.of(context).size.width < larghezzaTelefono) return Layout(child: _paginaTelefono(righe));
     return Layout(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: spazioPagina),

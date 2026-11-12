@@ -5,7 +5,7 @@ import 'package:cartellaviva/widgets/scheda.dart';
 import 'package:cartellaviva/widgets/testo.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:get/get.dart';
-import 'package:cartellaviva/helpers/services/offline/offline_store.dart';
+import 'package:cartellaviva/layout/navigazione.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 
 /// Avatar con le iniziali dell'utente collegato.
@@ -36,23 +36,13 @@ class AccountMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = SessionService.to;
+    // Solo l'account: le pagine della famiglia e dei documenti sono nel menu a
+    // sinistra (sul telefono, nel cassetto).
     final voci = <_Voce>[
-      _Voce(LucideIcons.scan_line, 'Nuovo documento', () => Get.toNamed('/documenti/nuovo')),
-      _Voce(LucideIcons.calendar, 'Scadenze', () => Get.toNamed('/scadenze')),
-      if (OfflineStore.supportato)
-        _Voce(LucideIcons.smartphone, 'Documenti offline', () => Get.toNamed('/offline')),
-      if (session.can('documento:read'))
-        _Voce(LucideIcons.sparkles, 'Analisi AI dei documenti', () => Get.toNamed('/documenti/analisi')),
-      if (session.can('condivisione:manage', resourceOwnerId: session.me?.id))
-        _Voce(LucideIcons.share_2, 'Condivisioni esterne', () => Get.toNamed('/condivisioni')),
-      _Voce(LucideIcons.circle_question_mark, 'Aiuto e guide', () => Get.toNamed('/aiuto')),
-      _Voce(LucideIcons.life_buoy, "Contatto d'emergenza", () => Get.toNamed('/emergenza')),
-      _Voce(LucideIcons.lightbulb, "Suggerisci un'idea", () => Get.toNamed('/idee')),
+      _Voce(LucideIcons.id_card, 'Dati anagrafici', () => apriDalMenu('/account/profile')),
+      _Voce(LucideIcons.shield_check, 'Sicurezza e accesso', () => apriDalMenu('/account/security')),
       // AGPL: chi usa l'app in rete deve poter avere il codice sorgente.
       _Voce(LucideIcons.code, 'Codice sorgente', () => launchUrl(Uri.parse(indirizzoCodiceSorgente), mode: LaunchMode.externalApplication)),
-      _Voce(LucideIcons.users, 'Membri e accessi', () => Get.toNamed('/tenant/members')),
-      _Voce(LucideIcons.id_card, 'Dati anagrafici', () => Get.toNamed('/account/profile')),
-      _Voce(LucideIcons.shield_check, 'Sicurezza', () => Get.toNamed('/account/security')),
       _Voce(LucideIcons.lock_keyhole, 'Blocca schermo', () => Get.offAllNamed('/auth/lock')),
       _Voce(LucideIcons.log_out, 'Esci', () => Get.offAllNamed('/auth/log_out'), pericolo: true),
     ];

@@ -166,7 +166,7 @@ final class TenantDeletion
 
         $this->em->wrapInTransaction(function () use ($tenant, $id, $anagrafiche): void {
             // Prima le tabelle con FK RESTRICT verso il tenant; il resto va in CASCADE.
-            foreach ([\App\Documenti\Entity\CondivisioneEsterna::class, Scadenza::class, Documento::class, ImportSource::class, MembroFamiglia::class] as $class) {
+            foreach ([\App\Documenti\Entity\CondivisioneEsterna::class, \App\Pratiche\Entity\Pagamento::class, \App\Pratiche\Entity\Pratica::class, Scadenza::class, Documento::class, ImportSource::class, MembroFamiglia::class] as $class) {
                 $this->em->createQuery('DELETE FROM '.$class.' x WHERE x.tenant = :t')->setParameter('t', $id, 'uuid')->execute();
             }
             if ([] !== $anagrafiche) {

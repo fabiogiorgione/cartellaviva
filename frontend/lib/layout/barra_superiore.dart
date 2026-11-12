@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
-import 'package:get/get.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/helpers/theme/preferenze_tema.dart';
 import 'package:cartellaviva/helpers/theme/tema_app.dart';
 import 'package:cartellaviva/layout/account_menu.dart';
+import 'package:cartellaviva/layout/navigazione.dart';
 import 'package:cartellaviva/widgets/logo_cartella_viva.dart';
 import 'package:cartellaviva/widgets/scheda.dart';
 import 'package:cartellaviva/widgets/testo.dart';
@@ -85,16 +86,17 @@ class _BarraSuperioreState extends State<BarraSuperiore> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       color: colori.testataSfondo.withAlpha(246),
       child: Row(children: [
-        InkWell(onTap: () => Get.toNamed('/dashboard'), child: const LogoCartellaViva(altezza: 26)),
+        InkWell(onTap: () => apriDalMenu('/dashboard'), child: const LogoCartellaViva(altezza: 26)),
         const SizedBox(width: 16),
         IconButton(tooltip: 'Riduci o espandi il menu', onPressed: PreferenzeTema.alternaBarra, icon: Icon(Icons.menu, color: colori.testataTesto)),
         const Spacer(),
         const PulsanteTema(),
-        IconButton(
-          tooltip: schermoIntero ? 'Esci dallo schermo intero' : 'Schermo intero',
-          onPressed: _alternaSchermoIntero,
-          icon: Icon(schermoIntero ? LucideIcons.minimize : LucideIcons.maximize, size: 20, color: colori.testataTesto),
-        ),
+        if (kIsWeb)
+          IconButton(
+            tooltip: schermoIntero ? 'Esci dallo schermo intero' : 'Schermo intero',
+            onPressed: _alternaSchermoIntero,
+            icon: Icon(schermoIntero ? LucideIcons.minimize : LucideIcons.maximize, size: 20, color: colori.testataTesto),
+          ),
         const SizedBox(width: 8),
         const VerticalDivider(width: 0),
         const SizedBox(width: 8),

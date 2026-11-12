@@ -385,6 +385,7 @@ class GuidaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = guidaPer(Get.parameters['id'] ?? '');
     return Layout(
+      indietro: '/aiuto',
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: spazioPagina),
         child: g == null

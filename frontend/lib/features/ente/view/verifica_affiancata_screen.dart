@@ -201,6 +201,7 @@ class _VerificaAffiancataScreenState extends State<VerificaAffiancataScreen> {
   @override
   Widget build(BuildContext context) {
     return PaginaEnte(
+      indietro: '/ente/richieste',
       titolo: 'Verifica delle risposte',
       sezione: 'Verifica',
       azioni: const [AiutoLink(guida: 'ente-richiesta')],

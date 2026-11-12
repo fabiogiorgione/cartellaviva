@@ -234,7 +234,7 @@ class _PortaleUtentiScreenState extends State<PortaleUtentiScreen> {
           Testo.bodyMedium('Utenti trovati: $totale', fontWeight: FontWeight.w500),
         ])),
         SizedBox(height: 16),
-        listaCarta(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        listaPannelloFiltri(Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 12, runSpacing: 12, children: [
             listaFiltroTesto(nome, 'Nome', _cerca),
             listaFiltroTesto(email, 'Email', _cerca),

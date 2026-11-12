@@ -62,6 +62,7 @@ class _ImportEsitoScreenState extends State<ImportEsitoScreen> {
   @override
   Widget build(BuildContext context) {
     return Layout(
+      indietro: '/documenti',
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: spazioPagina),
         child: Scheda(paddingAll: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

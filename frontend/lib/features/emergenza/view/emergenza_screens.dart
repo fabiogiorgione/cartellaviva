@@ -197,6 +197,19 @@ class _EmergenzaMieScreenState extends State<EmergenzaMieScreen> {
         padding: EdgeInsets.symmetric(horizontal: spazioPagina),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Testo.titleMedium('Contatto d\'emergenza', fontSize: 18, fontWeight: FontWeight.w500),
+          SizedBox(height: 8),
+          Testo.bodySmall('Qui trovi le famiglie che ti hanno scelto come contatto d\'emergenza.', tenue: true),
+          if (SessionService.to.can('membro:read') && SessionService.to.currentMembership?.roleSlug != 'emergenza') ...[
+            SizedBox(height: 12),
+            Scheda(paddingAll: 16, child: Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Testo.bodyMedium('Per scegliere chi è il contatto d\'emergenza della tua famiglia:'),
+                OutlinedButton.icon(
+                  onPressed: () => Get.toNamed('/famiglia/impostazioni?scheda=emergenza'),
+                  icon: const Icon(LucideIcons.settings, size: 16),
+                  label: const Text('Impostazioni famiglia › Emergenza'),
+                ),
+              ])),
+          ],
           SizedBox(height: spazioPagina),
           FutureBuilder<List<MioContattoEmergenza>>(
             future: _future,

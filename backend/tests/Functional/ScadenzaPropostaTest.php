@@ -49,7 +49,7 @@ final class ScadenzaPropostaTest extends ApiTestCase
         // Dopo l'OCR il job viene messo in coda.
         $this->queue()->reset();
         static::getContainer()->get(EventDispatcherInterface::class)->dispatch(new DocumentoOcrCompletatoEvent($this->entity($id)));
-        self::assertInstanceOf(ProponiScadenzaMessage::class, $this->queue()->getSent()[0]->getMessage());
+        self::assertNotEmpty(array_filter($this->queue()->getSent(), static fn ($e) => $e->getMessage() instanceof ProponiScadenzaMessage));
 
         $this->handler(ai: false)(new ProponiScadenzaMessage($id));
         $raw = $this->entity($id)->getScadenzaPropostaRaw();

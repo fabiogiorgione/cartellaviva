@@ -1,3 +1,5 @@
+import 'package:cartellaviva/features/pratiche/model/pagamento.dart' show PropostaPagamento, PagamentoCollegato;
+
 /// Categoria dei documenti (di sistema o del tenant).
 class Categoria {
   final String id;
@@ -62,6 +64,12 @@ class Documento {
   /// Solo nel dettaglio: scadenza trovata nel testo, ancora da confermare o ignorare.
   final ScadenzaProposta? scadenzaProposta;
 
+  /// Solo nel dettaglio e per chi gestisce i pagamenti: avviso di pagamento trovato, da confermare.
+  final PropostaPagamento? pagamentoProposta;
+
+  /// Solo nel dettaglio: pagamenti in cui il documento è l'avviso o la ricevuta.
+  final List<PagamentoCollegato> pagamenti;
+
   /// Scheda Anteprima: non_serve (si mostra l'originale), in_coda, pronta, fallita.
   final String? anteprimaStato;
 
@@ -90,6 +98,8 @@ class Documento {
     this.ocrText,
     this.possibiliDuplicati = const [],
     this.scadenzaProposta,
+    this.pagamentoProposta,
+    this.pagamenti = const [],
     this.anteprimaStato,
     this.anteprimaMime,
     this.anteprimaErrore,
@@ -131,6 +141,8 @@ class Documento {
         ownerName: json['ownerName'] as String?,
         createdAt: json['createdAt'] is String ? DateTime.tryParse(json['createdAt'] as String) : null,
         possibiliDuplicati: (json['possibiliDuplicati'] as List? ?? []).whereType<Map>().map((d) => d['id'] as String).toList(),
+        pagamentoProposta: json['pagamentoProposta'] is Map ? PropostaPagamento.fromJson(Map<String, dynamic>.from(json['pagamentoProposta'] as Map)) : null,
+        pagamenti: (json['pagamenti'] as List? ?? []).whereType<Map>().map((j) => PagamentoCollegato.fromJson(Map<String, dynamic>.from(j))).toList(),
         scadenzaProposta: json['scadenzaProposta'] is Map ? ScadenzaProposta.fromJson(Map<String, dynamic>.from(json['scadenzaProposta'] as Map)) : null,
         anteprimaStato: json['anteprimaStato'] as String?,
         anteprimaMime: json['anteprimaMime'] as String?,

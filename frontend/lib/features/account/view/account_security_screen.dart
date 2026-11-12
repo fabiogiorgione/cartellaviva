@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:get/get.dart';
 import 'package:cartellaviva/features/account/controller/account_security_controller.dart';
+import 'package:cartellaviva/helpers/services/ai_locale.dart';
 import 'package:cartellaviva/helpers/services/google_auth_service.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/features/account/view/credenziali_dialogs.dart';
@@ -61,6 +62,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                         CellaGriglia(colonne: 7, child: twoFactorCard()),
                         CellaGriglia(colonne: 5, child: googleCard()),
                         CellaGriglia(colonne: 7, child: credenzialiCard()),
+                        if (AiLocale.supportata) CellaGriglia(colonne: 5, child: aiLocaleCard()),
                       ]),
               ),
             ],
@@ -250,6 +252,46 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
           if (hasPassword)
             OutlinedButton(style: OutlinedButton.styleFrom(side: BorderSide(color: context.colori.primary), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))), onPressed: controller.busy ? null : () => showCambiaEmailDialog(context), child: Testo.bodySmall('Cambia email', color: context.colori.primary)),
         ]),
+      ],
+    );
+  }
+
+  // ---- Analisi sul telefono (modello Apple) ----------------------------------------
+
+  late final Future<StatoAiLocale> _statoAi = AiLocale.carica().then((_) => AiLocale.stato());
+
+  /// Spunta per dispositivo: le pratiche avviate da questo iPhone si analizzano qui.
+  Widget aiLocaleCard() {
+    return card(
+      icon: LucideIcons.smartphone,
+      title: 'Analisi sul telefono',
+      subtitle: 'Le pratiche (730, ISEE) avviate da questo iPhone leggono i documenti con il modello di Apple, sul telefono: l\'AI del server non li vede. '
+          'Il testo resta in memoria; al server tornano solo i valori, che ricontrolla. Funziona con l\'app aperta.',
+      children: [
+        FutureBuilder<StatoAiLocale>(
+          future: _statoAi,
+          builder: (context, snap) {
+            if (!snap.hasData) return const LinearProgressIndicator();
+            final stato = snap.data!;
+            return ValueListenableBuilder<bool>(
+              valueListenable: AiLocale.attiva,
+              builder: (context, attiva, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: attiva && stato.disponibile,
+                  onChanged: stato.disponibile ? (v) => AiLocale.imposta(v ?? false) : null,
+                  title: Testo.bodyMedium('Analizza i documenti su questo iPhone quando possibile'),
+                ),
+                Row(children: [
+                  badge(stato.disponibile ? 'Disponibile' : 'Non disponibile', stato.disponibile ? context.colori.success : context.colori.warning),
+                  SizedBox(width: 10),
+                  Expanded(child: Testo.bodySmall(stato.spiegazione, tenue: true)),
+                ]),
+              ]),
+            );
+          },
+        ),
       ],
     );
   }

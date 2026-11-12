@@ -13,6 +13,8 @@ import 'package:cartellaviva/features/scadenze/view/scadenza_form.dart';
 import 'package:cartellaviva/features/scadenze/view/scadenze_proposte.dart';
 import 'package:cartellaviva/features/aiuto/aiuto_widgets.dart';
 
+part 'scadenze_telefono.dart';
+
 /// Scadenziario: elenco raggruppato (scadute, prossimi 30 giorni, più avanti,
 /// in verifica, fatte) e calendario mensile.
 class ScadenzeScreen extends StatefulWidget {
@@ -73,6 +75,7 @@ class _ScadenzeScreenState extends State<ScadenzeScreen> {
         TextButton(onPressed: c.load, child: Text('Riprova')),
       ]));
     }
+    if (MediaQuery.of(context).size.width < larghezzaTelefono) return _bodyTelefono(c);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

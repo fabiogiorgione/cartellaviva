@@ -4,6 +4,7 @@ namespace App\Shared\Command;
 
 use App\Documenti\Repository\DocumentoRepository;
 use App\Ente\Entity\FileCifrato;
+use App\Pratiche\Entity\Pratica;
 use App\Import\Repository\ImportSourceRepository;
 use App\Shared\Audit\AuditLogger;
 use App\Shared\Crypto\CryptoException;
@@ -109,15 +110,16 @@ final class CryptoKeyCommand
         $perVersion = $this->connection->fetchAllKeyValue('SELECT key_version, COUNT(*) FROM documento WHERE cifrato = true GROUP BY key_version');
         $sourcesPerVersion = $this->connection->fetchAllKeyValue('SELECT key_version, COUNT(*) FROM import_source WHERE encrypted_dek IS NOT NULL GROUP BY key_version');
         $entiPerVersion = $this->connection->fetchAllKeyValue('SELECT key_version, COUNT(*) FROM ente_file GROUP BY key_version');
+        $pratichePerVersion = $this->connection->fetchAllKeyValue('SELECT key_version, COUNT(*) FROM pratica GROUP BY key_version');
         $rows = [];
         foreach ($this->keyRing->versions() as $v) {
             $fp = $this->keyRing->fingerprint($v);
-            $rows[] = [$v, $fp, $registered[$v] ?? '(non ancora usata)', isset($registered[$v]) ? ($registered[$v] === $fp ? 'OK' : 'DIVERSA!') : '-', $perVersion[$v] ?? 0, $sourcesPerVersion[$v] ?? 0, $entiPerVersion[$v] ?? 0];
+            $rows[] = [$v, $fp, $registered[$v] ?? '(non ancora usata)', isset($registered[$v]) ? ($registered[$v] === $fp ? 'OK' : 'DIVERSA!') : '-', $perVersion[$v] ?? 0, $sourcesPerVersion[$v] ?? 0, $entiPerVersion[$v] ?? 0, $pratichePerVersion[$v] ?? 0];
         }
         foreach (array_diff_key($registered, array_flip($this->keyRing->versions())) as $v => $fp) {
-            $rows[] = [$v, 'ASSENTE DAL FILE', $fp, 'MANCANTE!', $perVersion[$v] ?? 0, $sourcesPerVersion[$v] ?? 0, $entiPerVersion[$v] ?? 0];
+            $rows[] = [$v, 'ASSENTE DAL FILE', $fp, 'MANCANTE!', $perVersion[$v] ?? 0, $sourcesPerVersion[$v] ?? 0, $entiPerVersion[$v] ?? 0, $pratichePerVersion[$v] ?? 0];
         }
-        $io->table(['Versione', 'Impronta file', 'Impronta registrata', 'Esito', 'Documenti cifrati', 'Sorgenti import', 'File enti'], $rows);
+        $io->table(['Versione', 'Impronta file', 'Impronta registrata', 'Esito', 'Documenti cifrati', 'Sorgenti import', 'File enti', 'Pratiche'], $rows);
         $io->writeln('Versione corrente: '.$this->keyRing->currentVersion());
 
         return Command::SUCCESS;
@@ -216,7 +218,20 @@ final class CryptoKeyCommand
             }
         }
         $this->em->flush();
-        $io->success(sprintf('%d documenti, %d sorgenti di import e %d file degli enti portati alla versione %d. Le versioni precedenti si possono rimuovere dal file solo quando "status" mostra 0 in ogni colonna.', $count, $sources, $fileEnti, $current));
+        $this->em->clear();
+
+        // E delle pratiche (valori delle voci).
+        $pratiche = 0;
+        $query = $this->em->createQuery('SELECT p FROM '.Pratica::class.' p WHERE p.keyVersion <> :v')->setParameter('v', $current);
+        foreach ($query->toIterable() as $pratica) {
+            $dek = $this->cipher->unwrapDek($pratica->getEncryptedDek(), $pratica->getKeyVersion(), $pratica->getTenant()->getId(), $pratica->getId());
+            $wrapped = $this->cipher->wrapDek($dek, $pratica->getTenant()->getId(), $pratica->getId(), $current);
+            sodium_memzero($dek);
+            $pratica->rewrapDek($wrapped['wrapped'], $wrapped['version']);
+            ++$pratiche;
+        }
+        $this->em->flush();
+        $io->success(sprintf('%d documenti, %d sorgenti di import, %d file degli enti e %d pratiche portati alla versione %d. Le versioni precedenti si possono rimuovere dal file solo quando "status" mostra 0 in ogni colonna.', $count, $sources, $fileEnti, $pratiche, $current));
 
         return Command::SUCCESS;
     }
