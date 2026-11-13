@@ -59,6 +59,8 @@ requisiti:
             categorie: [documenti_identita]
             parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card', 'passaporto', 'tessera sanitaria', 'tessera europea di assicurazione malattia', 'patente di guida']
             nomi: ['ci', 'cie', 'cf', 'codice fiscale']
+            # Un curriculum cita la patente; un documento d'identità no.
+            senza: ['curriculum', 'esperienza lavorativa', 'esperienze lavorative', 'esperienze professionali', 'istruzione e formazione']
         tipi:
             carta_identita: { etichetta: 'Carta d''identità', parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card'], nomi: ['ci', 'cie'] }
             passaporto: { etichetta: 'Passaporto', parole: ['passaporto'] }
@@ -177,7 +179,7 @@ requisiti:
         scopri: targa
         riconosci:
             categorie: [veicoli]
-            parole: ['carta di circolazione', 'libretto di circolazione', 'tassa automobilistica', 'bollo auto', 'targa']
+            parole: ['carta di circolazione', 'libretto di circolazione', 'certificato di proprieta', 'tassa automobilistica', 'bollo auto']
         tipi:
             auto: { etichetta: 'Auto', parole: ['autovettura', 'auto'] }
             moto: { etichetta: 'Moto', parole: ['motociclo', 'moto'] }

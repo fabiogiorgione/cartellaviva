@@ -111,8 +111,17 @@ services:
   # Modelli: bash scripts/installa-server.sh --modelli (~3,7 GB, una volta sola).
   ollama:
     image: ollama/ollama:0.40.15
+    environment:
+      # Contesto fisso: il testo inviato (fino a ~6.000 caratteri) più la risposta ci stanno.
+      OLLAMA_CONTEXT_LENGTH: "8192"
+      OLLAMA_NUM_PARALLEL: "1"
     volumes:
       - ollama_models:/root/.ollama
+    # Tetto di memoria, senza swap: con molte analisi di fila il motore cresce fino a
+    # riempire la VM. Oltre i 5 GB il kernel chiude solo il modello (Ollama lo ricarica
+    # alla richiesta dopo): quel documento finisce in errore e "Cerca di nuovo" lo riprova.
+    mem_limit: 5g
+    memswap_limit: 5g
     restart: unless-stopped
 
   # Office -> PDF per le anteprime, su una rete senza accesso a internet, file temporanei in RAM.

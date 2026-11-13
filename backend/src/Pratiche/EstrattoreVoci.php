@@ -30,6 +30,12 @@ class EstrattoreVoci
     ) {
     }
 
+    /** Il modello AI usato (per i rapporti delle prove). */
+    public function modelloAi(): string
+    {
+        return $this->ai->modello();
+    }
+
     /**
      * Requisiti di cui il documento può parlare, per parole chiave nel testo o
      * nel nome del file (o per categoria). $vecchio: il documento è più vecchio

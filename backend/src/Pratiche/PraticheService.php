@@ -51,6 +51,7 @@ class PraticheService
         private readonly MessageBusInterface $bus,
         private readonly EstrattoreVoci $estrattore,
         private readonly DocumentService $testi,
+        private readonly DoppioniVoce $doppioni,
     ) {
     }
 
@@ -254,6 +255,7 @@ class PraticheService
         $persone = $pratica->getPersone();
         $membri = array_values(array_filter($d->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
         $voci = $this->estrattore->daGrezze($modello, $d->getCategoria()->getSlug(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, AiVociSuggeritore::vociDaJson($risposta), $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
+        $voci = $this->doppioni->nuove($modello, $pratica, $voci);
         unset($testo);
         foreach ($voci as $v) {
             $voce = new PraticaVoce($pratica, $v['requisito'], $v['persona'], $d, VoceStato::PROPOSTA, VoceOrigine::AI_TELEFONO);

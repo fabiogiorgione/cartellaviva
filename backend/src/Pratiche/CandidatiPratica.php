@@ -167,7 +167,8 @@ class CandidatiPratica
             $da = new \DateTimeImmutable('1900-01-01');
         }
 
-        return $this->em->createQueryBuilder()
+        /** @var list<Documento> $documenti */
+        $documenti = $this->em->createQueryBuilder()
             ->select('d', 'c')
             ->from(Documento::class, 'd')
             ->join('d.categoria', 'c')
@@ -183,5 +184,10 @@ class CandidatiPratica
             ->setMaxResults(3000)
             ->getQuery()
             ->getResult();
+        // I più recenti prima: tra due copie della stessa cosa (due visure, due stati di
+        // famiglia) resta la proposta del documento più nuovo (DoppioniVoce).
+        usort($documenti, static fn (Documento $x, Documento $y) => ($y->getDataDocumento() ?? $y->getCreatedAt()) <=> ($x->getDataDocumento() ?? $x->getCreatedAt()));
+
+        return $documenti;
     }
 }

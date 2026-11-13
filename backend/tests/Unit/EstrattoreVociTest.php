@@ -133,6 +133,9 @@ final class EstrattoreVociTest extends TestCase
         self::assertSame(['veicoli'], $codici('Carta di circolazione, targa AB123CD', 'l.pdf', true));
         self::assertSame([], $codici('Estratto conto, giacenza media annua euro 2.874,10', 'ec.pdf', true));
         self::assertSame([], $codici('Certificazione Unica 2019', 'cu.pdf', true));
+        // Un curriculum cita la patente; un foglio sulla servitù cita una targa: non sono documenti per l'ISEE.
+        self::assertSame([], $codici("Curriculum vitae\nEsperienza lavorativa\nPatente di guida B", 'cv.pdf'));
+        self::assertSame([], $codici('Registro violazioni servitù: auto targa AB123CD parcheggiata', 'registro.xlsx'));
     }
 
     public function testTextHelpers(): void

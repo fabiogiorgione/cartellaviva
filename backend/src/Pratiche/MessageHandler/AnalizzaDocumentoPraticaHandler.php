@@ -6,6 +6,7 @@ use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Event\DocumentoOcrCompletatoEvent;
 use App\Pratiche\CandidatiPratica;
+use App\Pratiche\DoppioniVoce;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Entity\PraticaAnalisi;
 use App\Pratiche\Entity\PraticaVoce;
@@ -43,6 +44,7 @@ final class AnalizzaDocumentoPraticaHandler
         private readonly PraticaRepository $pratiche,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly DoppioniVoce $doppioni,
     ) {
     }
 
@@ -89,6 +91,7 @@ final class AnalizzaDocumentoPraticaHandler
             return;
         }
 
+        $risultato['voci'] = $this->doppioni->nuove($modello, $pratica, $risultato['voci']);
         foreach ($risultato['voci'] as $v) {
             $voce = new PraticaVoce($pratica, $v['requisito'], $v['persona'], $documento, VoceStato::PROPOSTA, VoceOrigine::AI_SERVER);
             $this->cifratura->cifra($voce, $v['valori']);

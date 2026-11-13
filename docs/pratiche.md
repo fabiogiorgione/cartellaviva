@@ -236,6 +236,12 @@ Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, pr
 - **Importo prima dell'etichetta** (`TestoVoci::importoDopo`): negli estratti conto a colonne ("0,00 SALDO FINALE").
 - **"Cerca di nuovo nei documenti"** riprova anche i documenti scartati dalle sole regole, così un aggiornamento delle regole ha effetto sulle pratiche già avviate.
 
+**Meno proposte inutili** (13/11/2026, dalle 31 proposte escluse su 86 nella prima pratica ISEE vera):
+
+- **Doppioni tra documenti** (`DoppioniVoce`): la stessa cosa trovata in più documenti si propone una volta sola. Uguale = stesso requisito, stessa persona e stessa chiave: l'IBAN, la targa o, per i requisiti che non si sommano, tipo e importo (lo stesso immobile con la stessa rendita in tre visure). Vale anche contro le voci già confermate o escluse. Le spese (requisiti che si sommano) non si toccano: due scontrini uguali sono due spese.
+- **Prima i documenti più recenti** (`CandidatiPratica`): tra due copie resta la proposta del documento più nuovo.
+- Il documento d'identità esclude i curriculum (citano la patente); i veicoli non si riconoscono più dalla sola parola "targa" (bastava un foglio sulla servitù di un parcheggio).
+
 **Limiti noti.** Le regole sono state corrette guardando una sola cartella (ISEE 2026 di una famiglia): il risultato su quella cartella non è una misura indipendente, servono altre cartelle. Tesseract non legge alcune foto di tessere con nessuna impostazione provata: lì resta solo il nome del file. Il modello a volte sbaglia il tipo (una CU proposta come 730).
 
 ### Modello 730

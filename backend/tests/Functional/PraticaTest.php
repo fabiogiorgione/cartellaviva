@@ -8,6 +8,7 @@ use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Event\DocumentoOcrCompletatoEvent;
 use App\Pratiche\AiVociSuggeritore;
+use App\Pratiche\DoppioniVoce;
 use App\Pratiche\EstrattoreVoci;
 use App\Pratiche\Message\AnalizzaDocumentoPraticaMessage;
 use App\Pratiche\MessageHandler\AnalizzaDocumentoPraticaHandler;
@@ -258,6 +259,8 @@ final class PraticaTest extends ApiTestCase
     public function testIseeAccountsDiscoveredIbansPrecompiledComparisonAndRenewal(): void
     {
         $this->documento('casa', 'banca.png', "BANCA DI ESEMPIO SPA\nComunicazione annuale ai fini ISEE\nMario Rossi\nConto corrente IBAN IT60 X054 2811 1010 0000 0123 456\nSaldo contabile al 31/12/2024 euro 3.210,55\nGiacenza media annua 2024 euro 2.874,10", '2025-02-10', [$this->mario]);
+        // Lo stesso conto in un secondo estratto: una voce sola.
+        $this->documento('casa', 'banca2.png', "BANCA DI ESEMPIO SPA\nEstratto conto al 31/12/2024\nConto corrente IBAN IT60 X054 2811 1010 0000 0123 456\nSaldo contabile al 31/12/2024 euro 3.210,55\nGiacenza media annua 2024 euro 2.874,10", '2025-01-10', [$this->mario]);
         // Un altro conto citato in un estratto conto, senza saldo: niente voce, ma "da completare".
         $this->documento('casa', 'estratto.png', "Estratto conto\nIBAN IT74 L123 4512 3451 2345 6789 018\nMovimenti del mese", '2025-03-01');
         // Una bolletta con l'IBAN del fornitore non c'entra.
@@ -459,6 +462,7 @@ final class PraticaTest extends ApiTestCase
             $c->get(PraticaRepository::class),
             $c->get(MessageBusInterface::class),
             new NullLogger(),
+            $c->get(DoppioniVoce::class),
         );
     }
 

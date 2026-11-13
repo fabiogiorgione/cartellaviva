@@ -77,7 +77,7 @@ final class ProvaCartellaCommand extends Command
         foreach ($this->file($cartella) as $percorso) {
             $relativo = substr($percorso, \strlen($cartella) + 1);
             $mime = self::MIME[strtolower(pathinfo($percorso, \PATHINFO_EXTENSION))] ?? null;
-            $riga = ['file' => $relativo, 'caratteri' => 0, 'candidati' => [], 'voci' => [], 'atteso' => null, 'esito' => null, 'errore' => null];
+            $riga = ['file' => $relativo, 'caratteri' => 0, 'candidati' => [], 'voci' => [], 'atteso' => null, 'esito' => null, 'errore' => null, 'secondi' => null];
             try {
                 $testo = null === $mime ? '' : $this->ocr->extract((string) file_get_contents($percorso), $mime);
             } catch (\Throwable $e) {
@@ -88,10 +88,13 @@ final class ProvaCartellaCommand extends Command
             $nome = basename($percorso);
             $riga['candidati'] = array_map(static fn ($r) => $r->codice, EstrattoreVoci::candidati($modello, null, $testo, $nome));
             if ($conAi && [] !== $riga['candidati']) {
+                $inizio = microtime(true);
                 try {
                     foreach ($this->estrattore->estrai($modello, null, $nome, $testo, [], null)['voci'] as $v) {
-                        $riga['voci'][] = ['requisito' => $v['requisito'], 'campi' => array_keys($v['valori']), 'tipo' => $v['valori']['tipo'] ?? null];
+                        // I valori restano nel JSON (file 0600, fuori dal repository): servono a confrontare i modelli.
+                        $riga['voci'][] = ['requisito' => $v['requisito'], 'campi' => array_keys($v['valori']), 'tipo' => $v['valori']['tipo'] ?? null, 'valori' => $v['valori']];
                     }
+                    $riga['secondi'] = round(microtime(true) - $inizio, 1);
                 } catch (\Throwable $e) {
                     $riga['errore'] = mb_substr($e->getMessage(), 0, 80);
                 }
@@ -137,7 +140,7 @@ final class ProvaCartellaCommand extends Command
             }
         }
         if (null !== $input->getOption('json')) {
-            file_put_contents((string) $input->getOption('json'), json_encode(['modello' => $modello->codice, 'anno' => $modello->anno, 'conta' => $conta, 'file' => $righe], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
+            file_put_contents((string) $input->getOption('json'), json_encode(['modello' => $modello->codice, 'anno' => $modello->anno, 'ai' => $conAi ? $this->estrattore->modelloAi() : null, 'conta' => $conta, 'file' => $righe], \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
             @chmod((string) $input->getOption('json'), 0600);
         }
 
