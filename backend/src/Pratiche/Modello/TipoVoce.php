@@ -19,6 +19,8 @@ final class TipoVoce
         public readonly ?string $nota,
         /** @var list<string> parole (minuscole) che indicano il tipo nel testo, senza AI */
         public readonly array $parole = [],
+        /** @var list<string> parole intere che indicano il tipo nel nome del file ("ci", "cf") */
+        public readonly array $nomi = [],
     ) {
     }
 

@@ -94,7 +94,7 @@ final class EsportaEsempiCommand extends Command
                 $testo = null === $anon ? $e['testo'] : $anon->testo($e['testo']);
                 $oro = null === $anon ? $e['oro'] : array_map(static fn (array $o) => ['valori' => $anon->valori($o['valori'])] + $o, $e['oro']);
                 $nomeFile = $inChiaro ? $e['documento']->getNomeFileOriginale() : sprintf('documento-%d.%s', $n, strtolower(pathinfo($e['documento']->getNomeFileOriginale(), \PATHINFO_EXTENSION) ?: 'pdf'));
-                $richiesta = AiVociSuggeritore::richiesta($e['requisiti'], $nomeFile, mb_substr($testo, 0, 6000));
+                $richiesta = AiVociSuggeritore::richiesta($e['requisiti'], $nomeFile, AiVociSuggeritore::testoPerModello($e['requisiti'], $testo, 6000));
                 $risposta = EsempiPratica::risposta($e['modello'], $oro, $e['requisiti'], $testo, static fn (string $nome) => null === $anon ? $nome : $anon->nomePersona($nome));
                 fwrite($f, json_encode(['messages' => [
                     ['role' => 'system', 'content' => AiVociSuggeritore::istruzioni($e['modello']->titolo)],

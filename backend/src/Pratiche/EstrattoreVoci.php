@@ -30,13 +30,23 @@ class EstrattoreVoci
     ) {
     }
 
-    /** @return list<Requisito> */
-    public static function candidati(ModelloPratica $modello, ?string $categoriaSlug, string $testo): array
+    /**
+     * Requisiti di cui il documento può parlare, per parole chiave nel testo o
+     * nel nome del file (o per categoria). $vecchio: il documento è più vecchio
+     * della finestra della pratica, e valgono solo i requisiti "ancheVecchi".
+     *
+     * @return list<Requisito>
+     */
+    public static function candidati(ModelloPratica $modello, ?string $categoriaSlug, string $testo, string $nomeFile = '', bool $vecchio = false): array
     {
-        $basso = mb_strtolower($testo);
+        $basso = Requisito::normale($testo);
+        $nome = Requisito::nomeNormale($nomeFile);
         $punteggi = [];
         foreach ($modello->requisiti as $r) {
-            $punti = (null !== $categoriaSlug && \in_array($categoriaSlug, $r->categorie, true) ? 1 : 0) + ($r->parlaDi($basso) ? 2 : 0);
+            if ($vecchio && !$r->ancheVecchi) {
+                continue;
+            }
+            $punti = (null !== $categoriaSlug && \in_array($categoriaSlug, $r->categorie, true) ? 1 : 0) + ($r->parlaDi($basso, $nome) ? 2 : 0);
             if ($punti > 0) {
                 $punteggi[$r->codice] = $punti;
             }
@@ -51,15 +61,16 @@ class EstrattoreVoci
      *
      * @return array{metodo: string, voci: list<array{requisito: string, persona: ?MembroFamiglia, valori: array<string, string>}>}
      */
-    public function estrai(ModelloPratica $modello, ?string $categoriaSlug, string $nomeFile, string $testo, array $persone, ?MembroFamiglia $personaDocumento): array
+    public function estrai(ModelloPratica $modello, ?string $categoriaSlug, string $nomeFile, string $testo, array $persone, ?MembroFamiglia $personaDocumento, bool $vecchio = false): array
     {
-        $candidati = self::candidati($modello, $categoriaSlug, $testo);
+        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio);
         if ([] === $candidati) {
             return ['metodo' => 'regole', 'voci' => []];
         }
         $grezze = null;
         $metodo = 'regole';
-        if ($this->ai->isEnabled()) {
+        // Senza testo (una foto che l'OCR non ha letto) resta solo il nome del file: niente da chiedere all'AI.
+        if ('' !== trim($testo) && $this->ai->isEnabled()) {
             try {
                 $grezze = $this->ai->suggerisci($modello->titolo, $candidati, $nomeFile, $testo);
                 $metodo = 'ai';
@@ -69,10 +80,10 @@ class EstrattoreVoci
         }
         // Senza AI la sola categoria non basta: servono anche le parole chiave nel testo.
         if (null === $grezze) {
-            $grezze = $candidati[0]->parlaDi(mb_strtolower($testo)) ? [['requisito' => $candidati[0]->codice]] : [];
+            $grezze = $candidati[0]->parlaDi(Requisito::normale($testo), Requisito::nomeNormale($nomeFile)) ? [['requisito' => $candidati[0]->codice]] : [];
         }
 
-        return ['metodo' => $metodo, 'voci' => $this->daGrezze($modello, $categoriaSlug, $testo, $persone, $personaDocumento, $grezze)];
+        return ['metodo' => $metodo, 'voci' => $this->daGrezze($modello, $categoriaSlug, $testo, $persone, $personaDocumento, $grezze, $nomeFile, $vecchio)];
     }
 
     /**
@@ -84,9 +95,9 @@ class EstrattoreVoci
      *
      * @return list<array{requisito: string, persona: ?MembroFamiglia, valori: array<string, string>}>
      */
-    public function daGrezze(ModelloPratica $modello, ?string $categoriaSlug, string $testo, array $persone, ?MembroFamiglia $personaDocumento, array $grezze): array
+    public function daGrezze(ModelloPratica $modello, ?string $categoriaSlug, string $testo, array $persone, ?MembroFamiglia $personaDocumento, array $grezze, string $nomeFile = '', bool $vecchio = false): array
     {
-        $candidati = self::candidati($modello, $categoriaSlug, $testo);
+        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio);
         $voci = [];
         $viste = [];
         foreach ($grezze as $g) {
@@ -94,7 +105,7 @@ class EstrattoreVoci
             if (null === $requisito || !\in_array($requisito, $candidati, true)) {
                 continue;
             }
-            $voce = $this->verifica($modello, $requisito, $g, $testo, $persone, $personaDocumento);
+            $voce = $this->verifica($modello, $requisito, $g, $testo, $persone, $personaDocumento, $nomeFile);
             if (null === $voce) {
                 continue;
             }
@@ -118,7 +129,7 @@ class EstrattoreVoci
      *
      * @return array{requisito: string, persona: ?MembroFamiglia, valori: array<string, string>}|null
      */
-    private function verifica(ModelloPratica $modello, Requisito $r, array $g, string $testo, array $persone, ?MembroFamiglia $personaDocumento): ?array
+    private function verifica(ModelloPratica $modello, Requisito $r, array $g, string $testo, array $persone, ?MembroFamiglia $personaDocumento, string $nomeFile = ''): ?array
     {
         $valori = [];
         $annoAtteso = $r->annoAtteso($modello);
@@ -130,7 +141,7 @@ class EstrattoreVoci
             $v = match ($campo->tipo) {
                 'importo' => $this->importo($campo, $g[$codice] ?? null, $testo, $primoImporto),
                 'data' => self::dataDaAi($g[$codice] ?? '', $testo) ?? (null !== $annoAtteso ? TestoVoci::dataNellAnno($testo, $annoAtteso) : null),
-                'scelta' => AiVociSuggeritore::tipoValido($r, $g[$codice] ?? null, $testo),
+                'scelta' => AiVociSuggeritore::tipoValido($r, $g[$codice] ?? null, $testo, $nomeFile),
                 'tracciabile' => TestoVoci::tracciabile($testo) ?? (\in_array($g[$codice] ?? null, ['si', 'no'], true) ? $g[$codice] : 'non_risulta'),
                 'iban' => self::ibanDaAi($g[$codice] ?? null, $testo),
                 'targa' => self::targaDaAi($g[$codice] ?? null, $testo),
@@ -163,7 +174,7 @@ class EstrattoreVoci
             }
         }
 
-        return ['requisito' => $r->codice, 'persona' => $this->persona($r, $g['persona'] ?? null, $testo, $persone, $personaDocumento), 'valori' => $valori];
+        return ['requisito' => $r->codice, 'persona' => $this->persona($r, $g['persona'] ?? null, $testo, $persone, $personaDocumento, $nomeFile), 'valori' => $valori];
     }
 
     /**
@@ -238,7 +249,7 @@ class EstrattoreVoci
     }
 
     /** @param list<MembroFamiglia> $persone */
-    private function persona(Requisito $r, ?string $nome, string $testo, array $persone, ?MembroFamiglia $personaDocumento): ?MembroFamiglia
+    private function persona(Requisito $r, ?string $nome, string $testo, array $persone, ?MembroFamiglia $personaDocumento, string $nomeFile = ''): ?MembroFamiglia
     {
         if (!$r->perPersona) {
             return null;
@@ -256,7 +267,20 @@ class EstrattoreVoci
             }
         }
 
-        return 1 === \count($trovate) ? $trovate[0] : (1 === \count($persone) ? $persone[0] : null);
+        if (1 === \count($trovate)) {
+            return $trovate[0];
+        }
+        // Nel nome del file ("ci_mario.pdf"): vale se il nome è di una sola persona della pratica.
+        $nelNome = [];
+        $paroleFile = explode(' ', Requisito::nomeNormale($nomeFile));
+        foreach ($persone as $p) {
+            $proprio = Requisito::normale((string) $p->getAnagrafica()->getNome());
+            if (mb_strlen($proprio) >= 3 && \in_array($proprio, $paroleFile, true)) {
+                $nelNome[] = $p;
+            }
+        }
+
+        return 1 === \count($nelNome) ? $nelNome[0] : (1 === \count($persone) ? $persone[0] : null);
     }
 
     private static function stessoNome(string $a, string $b): bool

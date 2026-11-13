@@ -6,6 +6,7 @@ use App\Documenti\Entity\Documento;
 use App\Documenti\Enum\OcrStatus;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Modello\ModelloPratica;
+use App\Pratiche\Modello\Requisito;
 use App\Pratiche\Repository\PraticaRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -16,7 +17,10 @@ use Doctrine\ORM\EntityManagerInterface;
  *   riferimento al 30 giugno dopo (la CU arriva a marzo) o a fine anno della
  *   pratica se è più tardi (ISEE), o senza data e caricati da allora; solo
  *   con l'OCR completato.
- * - In chiaro: parole chiave di un requisito nel testo (la categoria da sola no).
+ * - Più vecchi della finestra: solo per i requisiti "ancheVecchi" (documento
+ *   d'identità, libretto, visura).
+ * - In chiaro: parole chiave di un requisito nel testo o nel nome del file
+ *   (la categoria da sola no).
  * - Cifrati: solo con il consenso della pratica, e solo nelle categorie dei
  *   requisiti o "Da categorizzare" (le parole chiave si controllano dopo,
  *   leggendo il testo in memoria). Senza consenso si contano e basta.
@@ -45,23 +49,24 @@ class CandidatiPratica
     /** Il documento è da guardare per questa pratica? (senza decifrare nulla) */
     public static function interessa(ModelloPratica $modello, Pratica $pratica, Documento $d): bool
     {
-        if (OcrStatus::COMPLETATO !== $d->getOcrStatus() || !self::nellaFinestra($modello, $d)) {
+        if (OcrStatus::COMPLETATO !== $d->getOcrStatus()) {
+            return false;
+        }
+        $vecchio = self::vecchio($modello, $d);
+        if (!$vecchio && !self::nellaFinestra($modello, $d)) {
+            return false;
+        }
+        if ($vecchio && !$modello->guardaAncheVecchi()) {
             return false;
         }
         $slug = $d->getCategoria()->getSlug();
         if ($d->isCifrato()) {
             return $pratica->haConsensoCifrati() && \in_array($slug, [...self::categorie($modello), ...self::SEMPRE_CIFRATI], true);
         }
-        // In chiaro serve una parola chiave nel testo: la sola categoria (es. Casa,
-        // con centinaia di documenti) manderebbe all'AI troppi documenti inutili.
-        $basso = mb_strtolower((string) $d->getOcrText());
-        foreach ($modello->requisiti as $r) {
-            if ($r->parlaDi($basso)) {
-                return true;
-            }
-        }
 
-        return false;
+        // In chiaro serve una parola chiave nel testo o nel nome del file: la sola
+        // categoria (es. Casa, con centinaia di documenti) manderebbe all'AI troppi documenti inutili.
+        return [] !== EstrattoreVoci::candidati($modello, null, (string) $d->getOcrText(), $d->getNomeFileOriginale(), $vecchio);
     }
 
     public static function nellaFinestra(ModelloPratica $modello, Documento $d): bool
@@ -73,6 +78,17 @@ class CandidatiPratica
         }
 
         return $d->getCreatedAt() >= $da;
+    }
+
+    /**
+     * Più vecchio della finestra: vale solo per i requisiti "ancheVecchi" (la
+     * carta d'identità, il libretto dell'auto, la visura non scadono con l'anno).
+     */
+    public static function vecchio(ModelloPratica $modello, Documento $d): bool
+    {
+        $da = $modello->finestra()[0];
+
+        return ($d->getDataDocumento() ?? $d->getCreatedAt()) < $da;
     }
 
     /**
@@ -94,9 +110,11 @@ class CandidatiPratica
                 continue;
             }
             $testo = (string) $d->getOcrText();
-            $basso = mb_strtolower($testo);
+            $basso = Requisito::normale($testo);
+            $nome = Requisito::nomeNormale($d->getNomeFileOriginale());
+            $vecchio = self::vecchio($modello, $d);
             foreach ($daScoprire as $r) {
-                if (!$r->parlaDi($basso) && !\in_array($d->getCategoria()->getSlug(), $r->categorie, true)) {
+                if (($vecchio && !$r->ancheVecchi) || (!$r->parlaDi($basso, $nome) && !\in_array($d->getCategoria()->getSlug(), $r->categorie, true))) {
                     continue;
                 }
                 foreach ('iban' === $r->scopri ? TestoVoci::iban($testo) : TestoVoci::targhe($testo) as $codice) {
@@ -138,10 +156,16 @@ class CandidatiPratica
         return ['daAnalizzare' => $daAnalizzare, 'analizzati' => $fatti, 'cifratiInAttesa' => $inAttesa];
     }
 
-    /** @return list<Documento> documenti del tenant nella finestra, con l'OCR completato */
+    /**
+     * @return list<Documento> documenti del tenant con l'OCR completato: quelli nella
+     *                         finestra e, se il modello li guarda, quelli più vecchi
+     */
     private function finestra(ModelloPratica $modello, Pratica $pratica): array
     {
         [$da, $a] = $modello->finestra();
+        if ($modello->guardaAncheVecchi()) {
+            $da = new \DateTimeImmutable('1900-01-01');
+        }
 
         return $this->em->createQueryBuilder()
             ->select('d', 'c')

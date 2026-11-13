@@ -124,7 +124,7 @@ Una pratica nasce da un **modello** (oggi `730` e `isee`; poi bonus nido, iscriz
 
 ### Fase 2a: com'è fatta (12/11/2026)
 
-**Regole.** `backend/config/pratiche/730-2025.yaml` (730/2026, verificato il 12/11/2026 sulle pagine dell'Agenzia delle Entrate citate nel file) e `730-2026.yaml` (**provvisorio**: copia del 2025 con `verificato: ~`; l'app lo dice). Ogni requisito ha `per` (persona o famiglia), `obbligatorio`, `somma` (se entra nelle somme), `riconosci` (`categorie`, `parole`), `tipi` (con `tracciabile`: `richiesto` / `non_richiesto` / `dipende`, `nota`, `parole`) e `campi` (`importo`, `data`, `testo`, `scelta` per il tipo, `tracciabile`). Il formato lo controlla `ModelliPratica::leggi` (test `ModelliPraticaTest`). Anno proposto per il 730: fino a settembre le spese dell'anno prima, da ottobre quelle dell'anno in corso.
+**Regole.** `backend/config/pratiche/730-2025.yaml` (730/2026, verificato il 12/11/2026 sulle pagine dell'Agenzia delle Entrate citate nel file) e `730-2026.yaml` (**provvisorio**: copia del 2025 con `verificato: ~`; l'app lo dice). Ogni requisito ha `per` (persona o famiglia), `obbligatorio`, `somma` (se entra nelle somme), `riconosci` (`categorie`, `parole`, `nomi`, `senza`), `ancheVecchi`, `tipi` (con `tracciabile`: `richiesto` / `non_richiesto` / `dipende`, `nota`, `parole`) e `campi` (`importo`, `data`, `testo`, `scelta` per il tipo, `tracciabile`). Il formato lo controlla `ModelliPratica::leggi` (test `ModelliPraticaTest`). Anno proposto per il 730: fino a settembre le spese dell'anno prima, da ottobre quelle dell'anno in corso.
 
 **Quali documenti si guardano** (`CandidatiPratica`): data dal 1° gennaio dell'anno al 30 giugno dell'anno dopo (o senza data e caricati dal 1° gennaio), OCR completato.
 - In chiaro: solo se il testo contiene una parola chiave di un requisito, a inizio parola ("farmac" trova "farmacia", "retta" non trova "corretta"). La sola categoria non basta: nei dati di prova la categoria Casa avrebbe mandato all'AI 102 documenti invece di 9.
@@ -218,6 +218,25 @@ Quali documenti (`EsempiPratica`): con voci confermate (positivi); con proposte 
 Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, prima delle etichette restavano i nomi veri delle persone scritti nei documenti; ora no. Non è perfetto (un indirizzo resta): il file va guardato prima di farlo uscire dal server. Lo strato LoRA allenato sui dati veri sarebbe a sua volta un dato personale; allenato sugli esempi anonimizzati no.
 
 **Regole ISEE per gli anni passati**: `isee-2024.yaml` (dati 2022) e `isee-2025.yaml` (dati 2023), provvisorie (stesse regole della DSU 2026), per ricostruire gli anni passati come banco di prova.
+
+### Selezione dei documenti: banco di prova e correzioni (13/11/2026)
+
+**Perché.** Sulla prima pratica ISEE vera quasi tutti i documenti persi non erano mai arrivati al modello: li scartava prima la selezione (parole chiave, finestra di date, OCR). Prima di allenare il modello va misurata e corretta quella.
+
+**Banco di prova.** `php bin/console app:pratiche:prova-cartella <cartella> --anno=2026 [--modello=isee] [--attesi=attesi.json] [--ai] [--json=risultato.json]` prende una cartella di documenti raccolti a mano per una pratica, li legge con lo stesso OCR dei documenti caricati e dice per ogni file per quale requisito verrebbe selezionato; con `--ai` chiede anche le voci al modello. `--attesi` è un JSON `{"percorso/file.pdf": "requisito" | "nessuno"}` scritto a mano una volta: il comando conta giusti, persi, sbagliati e selezionati senza motivo. Non salva nulla nel database. I documenti veri e i file degli attesi restano fuori dal repository (in sviluppo: copia nella `/tmp` del container, che è in RAM, e attesi in `backend/var/banco/`). I documenti si considerano dentro la finestra di date.
+
+**Correzioni alla selezione** (tutte misurate sul banco):
+
+- **Confronto delle parole chiave** su testo "normale" (`Requisito::normale`): minuscolo, senza accenti, apostrofi dritti, spazi e a capo ridotti a uno spazio. Le parole dei file YAML passano dalla stessa funzione al caricamento.
+- **Nome del file** come indizio: le `parole` si cercano anche lì (`stato-di-famiglia.pdf`), e `riconosci.nomi` elenca parole cercate solo nel nome, intere (`ci`, `cf`). Anche i `tipi` hanno `nomi`. Un documento senza testo (una foto che l'OCR non ha letto) riconosciuto dal nome diventa una voce con il solo tipo, senza passare dall'AI; la persona si prende dal nome del file se è di una sola persona della pratica.
+- **`riconosci.senza`**: parole che escludono il requisito (le lettere delle assicurazioni citano la non autosufficienza, ma non sono certificazioni di disabilità; il rendiconto di una polizza non è un conto).
+- **`ancheVecchi: true`** sul requisito: valgono anche i documenti più vecchi della finestra (documento d'identità, veicoli, immobili, affitto, disabilità, nucleo). Per gli altri (redditi, conti, polizze) la finestra resta.
+- **Requisiti ISEE nuovi**: `polizze` (polizze vita a contenuto finanziario) e `nucleo` (stato di famiglia). Parole in più per CU, visure e note di trascrizione.
+- **Testo per il modello** (`AiVociSuggeritore::testoPerModello`): oltre il limite di caratteri non si taglia più all'inizio, ma si tengono l'inizio e i tratti intorno alle etichette dei campi e alle parole chiave (lo stesso per il server, il telefono e gli esempi esportati).
+- **Importo prima dell'etichetta** (`TestoVoci::importoDopo`): negli estratti conto a colonne ("0,00 SALDO FINALE").
+- **"Cerca di nuovo nei documenti"** riprova anche i documenti scartati dalle sole regole, così un aggiornamento delle regole ha effetto sulle pratiche già avviate.
+
+**Limiti noti.** Le regole sono state corrette guardando una sola cartella (ISEE 2026 di una famiglia): il risultato su quella cartella non è una misura indipendente, servono altre cartelle. Tesseract non legge alcune foto di tessere con nessuna impostazione provata: lì resta solo il nome del file. Il modello a volte sbaglia il tipo (una CU proposta come 730).
 
 ### Modello 730
 

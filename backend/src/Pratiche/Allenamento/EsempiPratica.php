@@ -7,6 +7,7 @@ use App\Documenti\Entity\Documento;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Entity\PraticaVoce;
 use App\Pratiche\Enum\VoceStato;
+use App\Pratiche\CandidatiPratica;
 use App\Pratiche\EstrattoreVoci;
 use App\Pratiche\Modello\ModelliPratica;
 use App\Pratiche\Modello\ModelloPratica;
@@ -86,7 +87,7 @@ class EsempiPratica
             if ('' === $testo) {
                 continue;
             }
-            $requisiti = EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo);
+            $requisiti = EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
             $oro = [];
             $nonCandidati = [];
             foreach ($confermate as $v) {

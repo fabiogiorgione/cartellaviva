@@ -4,6 +4,7 @@ namespace App\Pratiche\Command;
 
 use App\Pratiche\Allenamento\EsempiPratica;
 use App\Pratiche\Allenamento\Valutazione;
+use App\Pratiche\CandidatiPratica;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\EstrattoreVoci;
 use App\Pratiche\Repository\PraticaRepository;
@@ -60,7 +61,7 @@ final class ValutaAnalisiCommand extends Command
                 }
                 $membri = array_values(array_filter($e['documento']->getMembri()->toArray(), static fn ($m) => \in_array($m, $p->getPersone(), true)));
                 try {
-                    $r = $this->estrattore->estrai($e['modello'], $e['documento']->getCategoria()->getSlug(), $e['documento']->getNomeFileOriginale(), $e['testo'], $p->getPersone(), 1 === \count($membri) ? $membri[0] : null);
+                    $r = $this->estrattore->estrai($e['modello'], $e['documento']->getCategoria()->getSlug(), $e['documento']->getNomeFileOriginale(), $e['testo'], $p->getPersone(), 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($e['modello'], $e['documento']));
                 } catch (\Throwable $t) {
                     $errori[] = $t->getMessage();
                     continue;

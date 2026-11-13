@@ -127,7 +127,7 @@ class AiVociSuggeritore
      */
     public function suggerisci(string $titoloPratica, array $requisiti, string $nomeFile, string $testo): array
     {
-        $richiesta = self::richiesta($requisiti, $nomeFile, mb_substr(trim($testo), 0, $this->maxChars));
+        $richiesta = self::richiesta($requisiti, $nomeFile, self::testoPerModello($requisiti, $testo, $this->maxChars));
         $response = $this->httpClient->request('POST', rtrim($this->url, '/').'/api/chat', ['timeout' => 300, 'max_duration' => 600, 'json' => [
             'model' => $this->model,
             'stream' => false,
@@ -145,10 +145,33 @@ class AiVociSuggeritore
     }
 
     /**
+     * Il testo che entra nella richiesta: se è più lungo del limite, l'inizio e i
+     * tratti intorno alle parole chiave e alle etichette dei campi (il saldo, la
+     * giacenza, il valore di una polizza stanno spesso a metà documento).
+     *
+     * @param list<Requisito> $requisiti
+     */
+    public static function testoPerModello(array $requisiti, string $testo, int $caratteri): string
+    {
+        $parole = [];
+        foreach ($requisiti as $r) {
+            // Prima le etichette dei campi: sono i punti in cui stanno i valori.
+            foreach ($r->campi as $c) {
+                array_push($parole, ...$c->etichette);
+            }
+        }
+        foreach ($requisiti as $r) {
+            array_push($parole, ...$r->parole);
+        }
+
+        return TestoVoci::porzioni(trim($testo), array_values(array_unique($parole)), $caratteri);
+    }
+
+    /**
      * Il tipo dell'AI vale solo se è uno di quelli del requisito; altrimenti
      * quello le cui parole compaiono di più nel testo, poi "altro", poi il primo.
      */
-    public static function tipoValido(Requisito $r, ?string $tipo, string $testo = ''): ?string
+    public static function tipoValido(Requisito $r, ?string $tipo, string $testo = '', string $nomeFile = ''): ?string
     {
         if ([] === $r->tipi) {
             return null;
@@ -156,11 +179,13 @@ class AiVociSuggeritore
         if (null !== $tipo && isset($r->tipi[$tipo])) {
             return $tipo;
         }
-        $basso = mb_strtolower($testo);
+        $nome = Requisito::nomeNormale($nomeFile);
+        $basso = $nome."\n".Requisito::normale($testo);
         $migliore = null;
         $punti = 0;
         foreach ($r->tipi as $t) {
-            $n = \count(array_filter($t->parole, static fn (string $p) => Requisito::contiene($basso, $p)));
+            $n = \count(array_filter($t->parole, static fn (string $p) => Requisito::contiene($basso, $p)))
+                + \count(array_filter($t->nomi, static fn (string $p) => 1 === preg_match('~(?<![\p{L}\p{N}])'.preg_quote($p, '~').'(?![\p{L}\p{N}])~u', $nome)));
             if ($n > $punti) {
                 [$migliore, $punti] = [$t->codice, $n];
             }

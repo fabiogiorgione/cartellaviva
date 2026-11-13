@@ -2,6 +2,8 @@
 
 namespace App\Pratiche;
 
+use App\Pratiche\Modello\Requisito;
+
 /**
  * Regole deterministiche sul testo di un documento per le voci delle pratiche:
  * importo totale, date, pagamento tracciabile, e i controlli che un valore
@@ -89,7 +91,7 @@ final class TestoVoci
         return null;
     }
 
-    /** Importo vicino a una delle etichette (es. "giacenza media"), in centesimi. */
+    /** Importo vicino a una delle etichette (es. "giacenza media"): subito dopo o, se non c'è, subito prima. In centesimi. */
     public static function importoDopo(string $testo, array $etichette): ?int
     {
         $basso = mb_strtolower($testo);
@@ -100,6 +102,12 @@ final class TestoVoci
                         return $c;
                     }
                 }
+            }
+        }
+        // Negli estratti conto a colonne l'importo sta prima: "31/12/24 1.250,00 SALDO FINALE".
+        foreach ($etichette as $e) {
+            if (preg_match('~'.self::IMPORTO.'[^\d\n]{0,12}'.preg_quote($e, '~').'~u', $basso, $m) && null !== ($c = ValoriVoce::centesimi($m[1]))) {
+                return $c;
             }
         }
 
@@ -159,9 +167,10 @@ final class TestoVoci
         if (mb_strlen($testo) <= $max) {
             return $testo;
         }
-        $basso = mb_strtolower($testo);
+        $basso = Requisito::piatto($testo);
         $tratti = [[0, min(600, $max)]];
         foreach ($parole as $p) {
+            $p = Requisito::piatto($p);
             for ($i = mb_strpos($basso, $p); false !== $i; $i = mb_strpos($basso, $p, $i + 1)) {
                 $tratti[] = [max(0, $i - 300), $i + 500];
             }

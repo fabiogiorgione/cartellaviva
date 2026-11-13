@@ -39,6 +39,18 @@ final class ModelloPratica
         return [new \DateTimeImmutable("$rif-01-01"), $fine];
     }
 
+    /** C'è almeno un requisito per cui valgono anche i documenti più vecchi della finestra? */
+    public function guardaAncheVecchi(): bool
+    {
+        foreach ($this->requisiti as $r) {
+            if ($r->ancheVecchi) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function requisito(string $codice): ?Requisito
     {
         return $this->requisiti[$codice] ?? null;

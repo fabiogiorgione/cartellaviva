@@ -307,6 +307,26 @@ final class PraticaTest extends ApiTestCase
         self::assertCount(2, $this->auditRows('pratica.inviata'));
     }
 
+    public function testIseeLooksAtOldDocumentsThatDoNotExpireAndAtFileNames(): void
+    {
+        // Più vecchi della finestra 2024-2026: la visura vale ancora, l'estratto conto del 2019 no.
+        $this->documento('casa', 'visura.png', "Visura catastale\nMario Rossi\nRendita catastale euro 247,90", '2018-09-26', [$this->mario]);
+        $this->documento('casa', 'vecchio.png', "Estratto conto\nIBAN IT60 X054 2811 1010 0000 0123 456\nSaldo contabile al 31/12/2019 euro 100,00\nGiacenza media annua 50,00", '2020-01-15');
+        // Una foto che l'OCR non ha letto: basta il nome del file, e dice anche di chi è.
+        $this->documento('casa', 'ci_luca.png', '', '2025-05-02');
+
+        $r = $this->request('POST', $this->url('/pratiche'), ['modello' => 'isee', 'anno' => 2026, 'persone' => [$this->id($this->mario), $this->id($this->luca)]], $this->token);
+        $this->assertStatus(201);
+        $this->esegui($r['id']);
+        $voci = $this->dettaglio($r['id'])['voci'];
+        usort($voci, static fn ($a, $b) => $a['requisito'] <=> $b['requisito']);
+        self::assertSame([['documento_identita', $this->id($this->luca)], ['immobili', $this->id($this->mario)]], array_map(static fn ($v) => [$v['requisito'], $v['personaId']], $voci));
+        self::assertEquals(['tipo' => 'carta_identita'], $voci[0]['valori']);
+        self::assertSame('247.90', $voci[1]['valori']['importo']);
+        // L'IBAN dell'estratto conto vecchio non diventa un conto "da completare".
+        self::assertSame([], array_filter($this->dettaglio($r['id'])['cosaManca'], static fn ($m) => 'rapporti' === $m['requisito'] && null !== $m['dettaglio']));
+    }
+
     public function testPhoneAnalysisGetsJobsAndOnlyCheckedValuesAreSaved(): void
     {
         $visita = $this->documento('casa', 'visita.png', self::VISITA, '2025-06-05');

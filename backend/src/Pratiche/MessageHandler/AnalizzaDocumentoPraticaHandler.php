@@ -80,8 +80,7 @@ final class AnalizzaDocumentoPraticaHandler
         $membri = array_values(array_filter($documento->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
         try {
             $testo = (string) $this->documents->readOcrText($documento);
-            $risultato = '' === trim($testo) ? ['metodo' => 'regole', 'voci' => []]
-                : $this->estrattore->estrai($modello, $documento->getCategoria()->getSlug(), $documento->getNomeFileOriginale(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null);
+            $risultato = $this->estrattore->estrai($modello, $documento->getCategoria()->getSlug(), $documento->getNomeFileOriginale(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($modello, $documento));
             unset($testo);
         } catch (\Throwable $e) {
             $this->logger->warning('Pratica {p}: analisi del documento {d} fallita ({reason})', ['p' => $message->praticaId, 'd' => $message->documentoId, 'reason' => $e->getMessage()]);

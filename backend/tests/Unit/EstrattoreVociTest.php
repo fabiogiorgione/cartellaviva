@@ -96,6 +96,45 @@ final class EstrattoreVociTest extends TestCase
         self::assertEquals(['tipo' => 'abitazione_principale', 'importo' => '247.90'], $voci[0]['valori']);
     }
 
+    public function testKeywordsSurviveLineBreaksApostrophesAndAccents(): void
+    {
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        $codici = static fn (string $testo, string $nome = 'x.pdf', bool $vecchio = false): array => array_map(static fn (Requisito $r) => $r->codice, EstrattoreVoci::candidati($isee, null, $testo, $nome, $vecchio));
+
+        self::assertSame("certificazione unica d'imposta identita'", Requisito::normale("CERTIFICAZIONE\n   UNICA  D’IMPOSTA  Identità'"));
+        self::assertSame('ci mario rossi', Requisito::nomeNormale('CI_Mario-Rossi.PDF'));
+        // Il testo dei PDF va a capo dove capita, e l'OCR scrive gli accenti come può.
+        self::assertSame(['redditi'], $codici("CERTIFICAZIONE\nUNICA 2025\nDATI RELATIVI AL SOSTITUTO D’IMPOSTA"));
+        self::assertSame(['documento_identita'], $codici("REPUBBLICA ITALIANA\nCARTA DI IDENTITA' / IDENTITY CARD"));
+        self::assertSame(['immobili'], $codici('Servizi Catastali - Visura attuale sintetica per soggetto'));
+
+        // Una lettera dell'assicurazione cita la non autosufficienza: non è una certificazione di disabilità.
+        self::assertSame([], $codici('Attestazione ai fini fiscali. Polizza n. 12: premi per il rischio di non autosufficienza versati nel 2024'));
+        // Il rendiconto di una polizza si chiama "estratto conto" nel nome del file: è una polizza, non un conto.
+        self::assertSame(['polizze'], $codici('Documento Unico di Rendicontazione al 12/10/2025 del suo investimento assicurativo', 'Estratto_Conto_Ramo_I.pdf'));
+    }
+
+    public function testFileNameAndOldDocuments(): void
+    {
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        $codici = static fn (string $testo, string $nome, bool $vecchio = false): array => array_map(static fn (Requisito $r) => $r->codice, EstrattoreVoci::candidati($isee, null, $testo, $nome, $vecchio));
+
+        // Una foto che l'OCR non ha letto si riconosce dal nome del file.
+        self::assertSame(['documento_identita'], $codici('', 'ci_mario_rossi.pdf'));
+        self::assertSame(['nucleo'], $codici('', 'stato-di-famiglia.pdf'));
+        self::assertSame([], $codici('', 'cinema.pdf'));
+        self::assertSame([], $codici('', 'ricevuta.pdf'));
+        $ci = $this->estrattore(null)->estrai($isee, null, 'ci_mario_rossi.pdf', '', [], null);
+        self::assertSame(['regole', [['requisito' => 'documento_identita', 'persona' => null, 'valori' => ['tipo' => 'carta_identita']]]], [$ci['metodo'], $ci['voci']]);
+        self::assertSame('tessera_sanitaria', $this->estrattore(null)->estrai($isee, null, 'cf_mario.jpg', '', [], null)['voci'][0]['valori']['tipo']);
+
+        // Più vecchi della finestra valgono solo per i documenti che non scadono con l'anno.
+        self::assertSame(['immobili'], $codici('Visura catastale, rendita catastale euro 247,90', 'v.pdf', true));
+        self::assertSame(['veicoli'], $codici('Carta di circolazione, targa AB123CD', 'l.pdf', true));
+        self::assertSame([], $codici('Estratto conto, giacenza media annua euro 2.874,10', 'ec.pdf', true));
+        self::assertSame([], $codici('Certificazione Unica 2019', 'cu.pdf', true));
+    }
+
     public function testTextHelpers(): void
     {
         $lungo = 'Intestazione FARMACIA'.str_repeat(' riempitivo', 500).' Ticket 2,00 TOTALE EURO 14,40'.str_repeat(' fine', 300);

@@ -162,7 +162,8 @@ class PraticheService
     }
 
     /**
-     * Mette in coda i documenti ancora da analizzare (e riprova quelli andati in errore).
+     * Mette in coda i documenti ancora da analizzare (e riprova quelli andati in
+     * errore o scartati dalle regole senza passare dall'AI).
      *
      * @return int documenti messi in coda
      */
@@ -171,7 +172,9 @@ class PraticheService
         if (PraticaStato::IN_CORSO !== $pratica->getStato()) {
             return 0;
         }
-        $this->em->getConnection()->executeStatement("DELETE FROM pratica_analisi WHERE pratica_id = :p AND esito = 'errore'", ['p' => $pratica->getId()->toRfc4122()]);
+        // Si riprovano gli errori e i documenti scartati dalle sole regole (senza AI): costa
+        // poco, e dopo un aggiornamento delle regole possono servire.
+        $this->em->getConnection()->executeStatement("DELETE FROM pratica_analisi WHERE pratica_id = :p AND (esito = 'errore' OR (esito = 'nessuna' AND metodo = 'regole'))", ['p' => $pratica->getId()->toRfc4122()]);
         $stato = $this->candidati->stato($this->modello($pratica), $pratica);
         // Sul telefono: i documenti li prende l'app (lavoriTelefono), il server non li manda all'AI.
         if ($pratica->analisiSulTelefono()) {
@@ -205,14 +208,13 @@ class PraticheService
                 continue;
             }
             $testo = (string) $this->testi->readOcrText($d);
-            $requisiti = EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo);
+            $requisiti = '' === trim($testo) ? [] : EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
             if ([] === $requisiti) {
                 // Cifrato senza parole utili: niente da chiedere al telefono.
                 $this->registraAnalisi($pratica, $d, PraticaAnalisi::NESSUNA, 'regole');
                 continue;
             }
-            $parole = array_merge(...array_map(static fn ($r) => $r->parole, $requisiti));
-            $richiesta = AiVociSuggeritore::richiesta($requisiti, $d->getNomeFileOriginale(), TestoVoci::porzioni(trim($testo), $parole, $caratteri));
+            $richiesta = AiVociSuggeritore::richiesta($requisiti, $d->getNomeFileOriginale(), AiVociSuggeritore::testoPerModello($requisiti, $testo, $caratteri));
             unset($testo);
             $lavori[] = [
                 'documentoId' => (string) $d->getId(),
@@ -251,7 +253,7 @@ class PraticheService
         $testo = (string) $this->testi->readOcrText($d);
         $persone = $pratica->getPersone();
         $membri = array_values(array_filter($d->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
-        $voci = $this->estrattore->daGrezze($modello, $d->getCategoria()->getSlug(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, AiVociSuggeritore::vociDaJson($risposta));
+        $voci = $this->estrattore->daGrezze($modello, $d->getCategoria()->getSlug(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, AiVociSuggeritore::vociDaJson($risposta), $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
         unset($testo);
         foreach ($voci as $v) {
             $voce = new PraticaVoce($pratica, $v['requisito'], $v['persona'], $d, VoceStato::PROPOSTA, VoceOrigine::AI_TELEFONO);

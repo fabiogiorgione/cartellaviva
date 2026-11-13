@@ -29,6 +29,22 @@ note: >-
 rinnovo: { titolo: 'Rinnovare l''ISEE', giorni: 30 }
 
 requisiti:
+    nucleo:
+        etichetta: 'Nucleo familiare'
+        descrizione: 'Lo stato di famiglia (o un''autocertificazione) con chi fa parte del nucleo alla data della DSU.'
+        per: famiglia
+        somma: false
+        data: libera
+        ancheVecchi: true
+        riconosci:
+            parole: ['stato di famiglia', 'situazione di famiglia', 'certificato contestuale', 'famiglia anagrafica']
+            senza: ['attestazione isee']
+        tipi:
+            stato_famiglia: { etichetta: 'Stato di famiglia' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Documento' }
+            data: { tipo: data, etichetta: 'Data del certificato' }
+
     documento_identita:
         etichetta: 'Documento e codice fiscale'
         descrizione: 'Un documento d''identità valido e la tessera sanitaria (codice fiscale) di ogni persona del nucleo.'
@@ -36,14 +52,16 @@ requisiti:
         obbligatorio: true
         somma: false
         data: libera
+        ancheVecchi: true
         riconosci:
             categorie: [documenti_identita]
-            parole: ['carta d''identità', 'carta di identità', 'passaporto', 'tessera sanitaria', 'patente di guida']
+            parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card', 'passaporto', 'tessera sanitaria', 'tessera europea di assicurazione malattia', 'patente di guida']
+            nomi: ['ci', 'cie', 'cf', 'codice fiscale']
         tipi:
-            carta_identita: { etichetta: 'Carta d''identità', parole: ['carta d''identità', 'carta di identità'] }
+            carta_identita: { etichetta: 'Carta d''identità', parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card'], nomi: ['ci', 'cie'] }
             passaporto: { etichetta: 'Passaporto', parole: ['passaporto'] }
             patente: { etichetta: 'Patente', parole: ['patente'] }
-            tessera_sanitaria: { etichetta: 'Tessera sanitaria', parole: ['tessera sanitaria'] }
+            tessera_sanitaria: { etichetta: 'Tessera sanitaria', parole: ['tessera sanitaria', 'tessera europea di assicurazione malattia'], nomi: ['cf', 'codice fiscale'] }
         campi:
             tipo: { tipo: scelta, etichetta: 'Documento' }
             data: { tipo: data, etichetta: 'Scadenza' }
@@ -56,7 +74,8 @@ requisiti:
         somma: false
         data: dopo
         riconosci:
-            parole: ['certificazione unica', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'prospetto di liquidazione']
+            parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'certificazione lavoro dipendente', 'originale per il percipiente', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'sostituto di imposta', 'prospetto di liquidazione']
+            senza: ['attestazione isee']
         tipi:
             cu: { etichetta: 'Certificazione Unica', parole: ['certificazione unica'] }
             dichiarazione_730: { etichetta: 'Modello 730', parole: ['730', 'prospetto di liquidazione'] }
@@ -93,6 +112,7 @@ requisiti:
         scopri: iban
         riconosci:
             parole: ['estratto conto', 'giacenza media', 'saldo contabile', 'comunicazione annuale', 'documento di sintesi', 'libretto di risparmio', 'deposito titoli', 'consistenza media', 'dichiarazione isee']
+            senza: ['attestazione isee', 'documento unico di rendicontazione']
         tipi:
             conto: { etichetta: 'Conto corrente', parole: ['conto corrente', 'c/c'] }
             libretto: { etichetta: 'Libretto di risparmio', parole: ['libretto'] }
@@ -108,14 +128,33 @@ requisiti:
             saldo_precompilata: { tipo: importo, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
             giacenza_precompilata: { tipo: importo, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
 
+    polizze:
+        etichetta: 'Polizze vita e investimenti assicurativi'
+        descrizione: 'Polizze vita a contenuto finanziario (ramo I, III, V): dal rendiconto annuale della compagnia, i premi versati o il valore al 31 dicembre.'
+        per: persona
+        data: libera
+        riconosci:
+            parole: ['documento unico di rendicontazione', 'investimento assicurativo', 'valore di riscatto', 'gestione separata', 'unit linked', 'polizza vita']
+            senza: ['attestazione ai fini fiscali', 'dichiarazione dei redditi', 'attestazione isee']
+        tipi:
+            polizza_vita: { etichetta: 'Polizza vita', nota: 'Le polizze di sola protezione (caso morte, infortuni) senza valore di riscatto non rientrano nel patrimonio.' }
+            altro: { etichetta: 'Altro investimento assicurativo' }
+        campi:
+            tipo: { tipo: scelta, etichetta: 'Tipo' }
+            emittente: { tipo: testo, etichetta: 'Compagnia' }
+            importo: { tipo: importo, etichetta: 'Premi versati o valore al 31/12', obbligatorio: true, etichette: ['premi versati', 'valore del capitale al', 'valore di riscatto', 'valore netto in caso di riscatto', 'prestazione maturata', 'capitale maturato', 'controvalore'] }
+            data: { tipo: data, etichetta: 'Data del rendiconto' }
+
     immobili:
         etichetta: 'Casa e altri immobili'
         descrizione: 'Visure o valori ai fini IMU di case e terreni, e il mutuo che resta da pagare.'
         per: persona
         somma: false
         data: libera
+        ancheVecchi: true
         riconosci:
-            parole: ['visura catastale', 'rendita catastale', 'valore ai fini imu', 'atto di compravendita', 'debito residuo']
+            parole: ['visura catastale', 'visura attuale', 'visura storica', 'visura per soggetto', 'visura per immobile', 'servizi catastali', 'rendita catastale', 'valore ai fini imu', 'atto di compravendita', 'nota di trascrizione', 'catasto fabbricati', 'catasto terreni', 'debito residuo']
+            senza: ['attestazione isee']
         tipi:
             abitazione_principale: { etichetta: 'Casa in cui si vive', parole: ['abitazione principale'] }
             altro_fabbricato: { etichetta: 'Altro fabbricato' }
@@ -132,6 +171,7 @@ requisiti:
         per: persona
         somma: false
         data: libera
+        ancheVecchi: true
         scopri: targa
         riconosci:
             categorie: [veicoli]
@@ -151,8 +191,10 @@ requisiti:
         per: famiglia
         somma: false
         data: libera
+        ancheVecchi: true
         riconosci:
             parole: ['contratto di locazione', 'canone di locazione', 'canone annuo']
+            senza: ['modello 730', 'attestazione isee']
         tipi:
             abitazione: { etichetta: 'Abitazione del nucleo' }
         campi:
@@ -167,9 +209,12 @@ requisiti:
         per: persona
         somma: false
         data: libera
+        ancheVecchi: true
         riconosci:
             categorie: [salute]
             parole: ['invalidità civile', 'legge 104', 'non autosufficien', 'indennità di accompagnamento', 'handicap']
+            # Le lettere delle assicurazioni citano invalidità e non autosufficienza: non sono certificazioni.
+            senza: ['polizza', 'premio', 'assicurazion']
         tipi:
             media: { etichetta: 'Disabilità media' }
             grave: { etichetta: 'Disabilità grave', parole: ['grave'] }

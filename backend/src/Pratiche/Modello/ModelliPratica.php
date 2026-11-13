@@ -79,6 +79,12 @@ class ModelliPratica
         return $this->modelli;
     }
 
+    /** @return list<string> parole chiave pronte per il confronto (vedi Requisito::normale) */
+    private static function parole(mixed $elenco): array
+    {
+        return array_values(array_filter(array_map(static fn ($p) => Requisito::normale((string) $p), (array) $elenco), static fn (string $p) => '' !== $p));
+    }
+
     public static function leggi(mixed $dati, string $file): ModelloPratica
     {
         $errore = static fn (string $cosa): \LogicException => new \LogicException(sprintf('Modello di pratica %s: %s.', $file, $cosa));
@@ -123,7 +129,7 @@ class ModelliPratica
                 if (!\is_array($t) || !\is_string($t['etichetta'] ?? null) || !\in_array($tracciabile, [TipoVoce::RICHIESTO, TipoVoce::NON_RICHIESTO, TipoVoce::DIPENDE], true)) {
                     throw $errore("tipo \"$rc.$tc\" non valido");
                 }
-                $tipi[(string) $tc] = new TipoVoce((string) $tc, $t['etichetta'], $tracciabile, \is_string($t['nota'] ?? null) ? $t['nota'] : null, array_values(array_map(static fn ($p) => mb_strtolower((string) $p), (array) ($t['parole'] ?? []))));
+                $tipi[(string) $tc] = new TipoVoce((string) $tc, $t['etichetta'], $tracciabile, \is_string($t['nota'] ?? null) ? $t['nota'] : null, self::parole($t['parole'] ?? []), self::parole($t['nomi'] ?? []));
             }
             $campi = [];
             foreach ((array) ($r['campi'] ?? []) as $cc => $c) {
@@ -169,11 +175,14 @@ class ModelliPratica
                 true === ($r['obbligatorio'] ?? false),
                 false !== ($r['somma'] ?? true),
                 array_values(array_map('strval', (array) ($riconosci['categorie'] ?? []))),
-                array_values(array_map(static fn ($p) => mb_strtolower((string) $p), (array) ($riconosci['parole'] ?? []))),
+                self::parole($riconosci['parole'] ?? []),
                 $tipi,
                 $campi,
                 $data,
                 $scopri,
+                self::parole($riconosci['nomi'] ?? []),
+                self::parole($riconosci['senza'] ?? []),
+                true === ($r['ancheVecchi'] ?? false),
             );
         }
         if ([] === $requisiti) {
