@@ -21,6 +21,8 @@ final class Campo
         public readonly ?string $confronta = null,
         /** compilato solo dall'utente, mai dall'AI (es. i valori della precompilata) */
         public readonly bool $soloUtente = false,
+        /** tra più importi vicini alle etichette vale l'ultimo (il saldo di fine anno in un estratto con i saldi di ogni mese) */
+        public readonly bool $ultimo = false,
     ) {
     }
 

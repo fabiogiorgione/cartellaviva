@@ -55,7 +55,7 @@ requisiti:
             parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card', 'passaporto', 'tessera sanitaria', 'tessera europea di assicurazione malattia', 'patente di guida']
             nomi: ['ci', 'cie', 'cf', 'codice fiscale']
             # Un curriculum cita la patente; un documento d'identità no.
-            senza: ['curriculum', 'esperienza lavorativa', 'esperienze lavorative', 'esperienze professionali', 'istruzione e formazione']
+            senza: ['attestazione isee', 'curriculum', 'esperienza lavorativa', 'esperienze lavorative', 'esperienze professionali', 'istruzione e formazione']
         tipi:
             carta_identita: { etichetta: 'Carta d''identità', parole: ['carta d''identità', 'carta di identità', 'carta identità', 'identity card'], nomi: ['ci', 'cie'] }
             passaporto: { etichetta: 'Passaporto', parole: ['passaporto'] }
@@ -76,7 +76,7 @@ requisiti:
             parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'certificazione lavoro dipendente', 'originale per il percipiente', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'sostituto di imposta', 'prospetto di liquidazione']
             senza: ['attestazione isee']
         tipi:
-            cu: { etichetta: 'Certificazione Unica', parole: ['certificazione unica'] }
+            cu: { etichetta: 'Certificazione Unica', parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'originale per il percipiente', 'certificazione lavoro dipendente'] }
             dichiarazione_730: { etichetta: 'Modello 730', parole: ['730', 'prospetto di liquidazione'] }
             redditi_pf: { etichetta: 'Redditi PF', parole: ['redditi persone fisiche'] }
         campi:
@@ -91,6 +91,7 @@ requisiti:
         per: persona
         riconosci:
             parole: ['assegno di mantenimento', 'assegno periodico', 'borsa di studio']
+            senza: ['attestazione isee']
         tipi:
             mantenimento_ricevuto: { etichetta: 'Mantenimento ricevuto' }
             mantenimento_versato: { etichetta: 'Mantenimento versato' }
@@ -122,7 +123,7 @@ requisiti:
             tipo: { tipo: scelta, etichetta: 'Rapporto' }
             emittente: { tipo: testo, etichetta: 'Banca o intermediario' }
             iban: { tipo: iban, etichetta: 'IBAN' }
-            importo: { tipo: importo, etichetta: 'Saldo al 31/12', obbligatorio: true, etichette: ['saldo al 31', 'saldo contabile', 'saldo finale', 'saldo'] }
+            importo: { tipo: importo, etichetta: 'Saldo al 31/12', obbligatorio: true, ultimo: true, etichette: ['saldo al 31', 'saldo contabile al 31', 'saldo finale', 'saldo contabile', 'saldo'] }
             giacenza: { tipo: importo, etichetta: 'Giacenza media annua', etichette: ['giacenza media', 'consistenza media'] }
             saldo_precompilata: { tipo: importo, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
             giacenza_precompilata: { tipo: importo, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
@@ -141,7 +142,7 @@ requisiti:
         campi:
             tipo: { tipo: scelta, etichetta: 'Tipo' }
             emittente: { tipo: testo, etichetta: 'Compagnia' }
-            importo: { tipo: importo, etichetta: 'Premi versati o valore al 31/12', obbligatorio: true, etichette: ['premi versati', 'valore del capitale al', 'valore di riscatto', 'valore netto in caso di riscatto', 'prestazione maturata', 'capitale maturato', 'controvalore'] }
+            importo: { tipo: importo, etichetta: 'Premi versati o valore al 31/12', obbligatorio: true, ultimo: true, etichette: ['valore del capitale al', 'valore netto in caso di riscatto', 'valore di riscatto', 'capitale maturato', 'prestazione maturata', 'controvalore', 'premi versati'] }
             data: { tipo: data, etichetta: 'Data del rendiconto' }
 
     immobili:
@@ -175,6 +176,7 @@ requisiti:
         riconosci:
             categorie: [veicoli]
             parole: ['carta di circolazione', 'libretto di circolazione', 'certificato di proprieta', 'tassa automobilistica', 'bollo auto']
+            senza: ['attestazione isee']
         tipi:
             auto: { etichetta: 'Auto', parole: ['autovettura', 'auto'] }
             moto: { etichetta: 'Moto', parole: ['motociclo', 'moto'] }
@@ -213,7 +215,7 @@ requisiti:
             categorie: [salute]
             parole: ['invalidità civile', 'legge 104', 'non autosufficien', 'indennità di accompagnamento', 'handicap']
             # Le lettere delle assicurazioni citano invalidità e non autosufficienza: non sono certificazioni.
-            senza: ['polizza', 'premio', 'assicurazion']
+            senza: ['attestazione isee', 'polizza', 'premio', 'assicurazion']
         tipi:
             media: { etichetta: 'Disabilità media' }
             grave: { etichetta: 'Disabilità grave', parole: ['grave'] }

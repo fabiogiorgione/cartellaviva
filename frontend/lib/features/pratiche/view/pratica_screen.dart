@@ -8,6 +8,7 @@ import 'package:cartellaviva/features/pratiche/api/pratiche_api.dart';
 import 'package:cartellaviva/features/pratiche/controller/da_confermare_service.dart';
 import 'package:cartellaviva/features/pratiche/model/pagamento.dart' show formatEuro;
 import 'package:cartellaviva/features/pratiche/model/pratica.dart';
+import 'package:cartellaviva/features/pratiche/view/dove_cercare.dart';
 import 'package:cartellaviva/features/pratiche/view/pagamento_widgets.dart';
 import 'package:cartellaviva/features/pratiche/view/voce_form.dart';
 import 'package:cartellaviva/features/scadenze/model/scadenza.dart' show formatDataBreve;
@@ -180,6 +181,9 @@ class _PraticaScreenState extends State<PraticaScreen> {
         _avviso(LucideIcons.loader, context.colori.primary,
             'Sto leggendo i documenti: ${p.analisi.inCoda} da analizzare. Puoi lasciare la pagina, le proposte compaiono qui e in "Da confermare".'),
       if (p.inCorso && p.analisi.cifratiInAttesa > 0 && p.consensoCifrati == null) _consenso(p),
+      if (p.ambito != null)
+        _avviso(LucideIcons.folder_search, context.colori.primary, 'Cerca solo in: ${p.ambito!.descrizione}.',
+            azione: p.puoGestire && p.inCorso ? TextButton(onPressed: occupato ? null : () => _doveCercare(p), child: const Text('Cambia')) : null),
       if (p.scadenzaRinnovo != null)
         _avviso(LucideIcons.calendar_clock, context.colori.primary,
             'Scade il ${formatDataBreve(p.scadenzaRinnovo!.data)}: il promemoria del rinnovo è nelle Scadenze.'),
@@ -528,6 +532,15 @@ class _PraticaScreenState extends State<PraticaScreen> {
     );
   }
 
+  Future<void> _doveCercare(Pratica p) async {
+    final t = tenant;
+    if (t == null) return;
+    final scelta = await scegliAmbito(context, t, p.ambito);
+    if (scelta == null) return;
+    await _fai((t) => PraticheApi.modificaAmbito(t, p.id, scelta.ambito),
+        fatto: scelta.ambito == null ? 'Cerco di nuovo in tutti i documenti.' : 'Cerco di nuovo nei documenti scelti.');
+  }
+
   void _pacchetto(Pratica p) => _fai((t) async => saveOrOpenFile(await PraticheApi.pacchetto(t, p.id), '${p.titolo.replaceAll(RegExp(r'[^\w\- ]+'), ' ').trim()}.zip', 'application/zip'));
 
   /// Azioni secondarie della pratica: pulsanti su schermo largo, menu ⋯ in alto sul telefono.
@@ -543,6 +556,7 @@ class _PraticaScreenState extends State<PraticaScreen> {
           else
             (etichetta: 'Riapri', azione: () => _fai((t) => PraticheApi.modifica(t, p.id, stato: 'in_corso')), pericolosa: false),
           if (p.inCorso) (etichetta: 'Cerca di nuovo nei documenti', azione: () => _fai((t) => PraticheApi.analizza(t, p.id), fatto: 'Ricerca nei documenti avviata.'), pericolosa: false),
+          if (p.inCorso) (etichetta: 'Dove cercare…', azione: () => _doveCercare(p), pericolosa: false),
           if (p.consensoCifrati != null)
             (
               etichetta: 'Revoca il consenso per i cifrati',

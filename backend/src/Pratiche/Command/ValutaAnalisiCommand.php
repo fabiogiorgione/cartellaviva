@@ -61,7 +61,7 @@ final class ValutaAnalisiCommand extends Command
                 }
                 $membri = array_values(array_filter($e['documento']->getMembri()->toArray(), static fn ($m) => \in_array($m, $p->getPersone(), true)));
                 try {
-                    $r = $this->estrattore->estrai($e['modello'], $e['documento']->getCategoria()->getSlug(), $e['documento']->getNomeFileOriginale(), $e['testo'], $p->getPersone(), 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($e['modello'], $e['documento']));
+                    $r = $this->estrattore->estrai($e['modello'], $e['documento']->getCategoria()->getSlug(), $e['documento']->getNomeFileOriginale(), $e['testo'], $p->getPersone(), 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($e['modello'], $e['documento'], $p), $p->analizzaTutti());
                 } catch (\Throwable $t) {
                     $errori[] = $t->getMessage();
                     continue;

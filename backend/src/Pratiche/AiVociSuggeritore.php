@@ -167,25 +167,64 @@ class AiVociSuggeritore
         return TestoVoci::porzioni(trim($testo), array_values(array_unique($parole)), $caratteri);
     }
 
+    /** Caratteri iniziali del testo in cui si cerca il titolo del documento. */
+    private const TITOLO = 1500;
+
     /**
-     * Il tipo dell'AI vale solo se è uno di quelli del requisito; altrimenti
-     * quello le cui parole compaiono di più nel testo, poi "altro", poi il primo.
+     * Il tipo: se all'inizio del documento (o nel nome del file) c'è una frase di
+     * un tipo, vale il tipo che compare per primo ("CERTIFICAZIONE UNICA" in
+     * testa è una CU anche se l'AI dice 730), a meno che anche il tipo dell'AI
+     * compaia lì. Altrimenti il tipo dell'AI se è uno di quelli del requisito,
+     * poi quello le cui parole compaiono di più nel testo, poi "altro", poi il primo.
      */
     public static function tipoValido(Requisito $r, ?string $tipo, string $testo = '', string $nomeFile = ''): ?string
     {
         if ([] === $r->tipi) {
             return null;
         }
+        $nome = Requisito::nomeNormale($nomeFile);
+        $basso = Requisito::normale($testo);
+        $inizio = mb_substr($basso, 0, self::TITOLO);
+        $parolaIntera = static fn (string $p, string $t): bool => 1 === preg_match('~(?<![\p{L}\p{N}])'.preg_quote($p, '~').'(?![\p{L}\p{N}])~u', $t);
+
+        // Posizione della prima parola di ogni tipo nel titolo (il nome del file conta come posizione 0).
+        $posizioni = [];
+        foreach ($r->tipi as $t) {
+            $min = null;
+            // Solo frasi di più parole ("certificazione unica", "stato di famiglia"): una parola
+            // sola come "farmac" in cima è spesso il nome del negozio, non il tipo di documento.
+            foreach (array_filter($t->parole, static fn (string $p) => str_contains($p, ' ')) as $p) {
+                if (Requisito::contiene($nome, $p)) {
+                    $min = 0;
+                    break;
+                }
+                if (Requisito::contiene($inizio, $p) && 1 === preg_match('~(?<![\p{L}\p{N}])'.preg_quote($p, '~').'~u', $inizio, $m, \PREG_OFFSET_CAPTURE)) {
+                    $pos = mb_strlen(substr($inizio, 0, $m[0][1])) + 1;
+                    $min = null === $min ? $pos : min($min, $pos);
+                }
+            }
+            foreach ($t->nomi as $p) {
+                if ($parolaIntera($p, $nome)) {
+                    $min = 0;
+                }
+            }
+            if (null !== $min) {
+                $posizioni[$t->codice] = $min;
+            }
+        }
+        if ([] !== $posizioni && !(null !== $tipo && isset($posizioni[$tipo]))) {
+            asort($posizioni);
+
+            return (string) array_key_first($posizioni);
+        }
         if (null !== $tipo && isset($r->tipi[$tipo])) {
             return $tipo;
         }
-        $nome = Requisito::nomeNormale($nomeFile);
-        $basso = $nome."\n".Requisito::normale($testo);
         $migliore = null;
         $punti = 0;
         foreach ($r->tipi as $t) {
-            $n = \count(array_filter($t->parole, static fn (string $p) => Requisito::contiene($basso, $p)))
-                + \count(array_filter($t->nomi, static fn (string $p) => 1 === preg_match('~(?<![\p{L}\p{N}])'.preg_quote($p, '~').'(?![\p{L}\p{N}])~u', $nome)));
+            $n = \count(array_filter($t->parole, static fn (string $p) => Requisito::contiene($nome."\n".$basso, $p)))
+                + \count(array_filter($t->nomi, static fn (string $p) => $parolaIntera($p, $nome)));
             if ($n > $punti) {
                 [$migliore, $punti] = [$t->codice, $n];
             }

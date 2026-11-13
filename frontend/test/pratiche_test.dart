@@ -155,4 +155,20 @@ void main() {
     expect(p.nonServePer('rapporti', null), isFalse);
     expect(p.scadenzaRinnovo!.data, DateTime(2026, 12, 31));
   });
+
+  test("l'ambito della pratica si legge, si descrive e si rimanda", () {
+    final a = AmbitoPratica.fromJson({
+      'categorie': [
+        {'id': 'c1', 'nome': 'ISEE 2026'},
+        {'id': 'c2', 'nome': 'Banca'},
+      ],
+      'etichette': ['estratto conto'],
+      'tutti': true,
+    });
+    expect(a.descrizione, 'ISEE 2026, Banca · etichetta: estratto conto · li analizzo tutti');
+    expect(a.toJson(), {'categorie': ['c1', 'c2'], 'etichette': ['estratto conto'], 'tutti': true});
+    expect(const AmbitoPratica().vuoto, isTrue);
+    expect(Pratica.fromJson({...dettaglio, 'ambito': null}).ambito, isNull);
+    expect(Pratica.fromJson({...dettaglio, 'ambito': a.toJson()..['categorie'] = [{'id': 'c1', 'nome': 'ISEE 2026'}]}).ambito!.categorie.single.nome, 'ISEE 2026');
+  });
 }

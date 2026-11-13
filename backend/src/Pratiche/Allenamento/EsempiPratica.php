@@ -87,7 +87,7 @@ class EsempiPratica
             if ('' === $testo) {
                 continue;
             }
-            $requisiti = EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
+            $requisiti = EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d, $pratica), $pratica->analizzaTutti());
             $oro = [];
             $nonCandidati = [];
             foreach ($confermate as $v) {

@@ -91,27 +91,77 @@ final class TestoVoci
         return null;
     }
 
-    /** Importo vicino a una delle etichette (es. "giacenza media"): subito dopo o, se non c'è, subito prima. In centesimi. */
-    public static function importoDopo(string $testo, array $etichette): ?int
+    /** Importo vicino a una delle etichette (es. "giacenza media"), in centesimi: il primo di importiVicini(). */
+    public static function importoDopo(string $testo, array $etichette, bool $ultimo = false): ?int
+    {
+        $trovati = self::importiVicini($testo, $etichette);
+
+        return [] === $trovati ? null : ($ultimo ? $trovati[\count($trovati) - 1] : $trovati[0]);
+    }
+
+    /**
+     * Importi vicini alla prima etichetta (in ordine di elenco) che ne ha:
+     * subito dopo ("Saldo contabile al 31/12/2024 euro 3.210,55"), subito prima
+     * ("1.250,00 SALDO FINALE", estratti conto a colonne) o nella stessa colonna
+     * delle righe sotto (tabelle con l'intestazione "GIACENZA MEDIA"). In centesimi,
+     * nell'ordine del testo.
+     *
+     * @param list<string> $etichette minuscole
+     *
+     * @return list<int>
+     */
+    public static function importiVicini(string $testo, array $etichette): array
     {
         $basso = mb_strtolower($testo);
+        $righe = explode("\n", $basso);
+        // Per etichetta e importo sulla stessa riga contano le parole, non l'impaginazione:
+        // gli spazi di allineamento diventano uno. Le colonne (sotto) usano le righe originali.
+        $compatto = (string) preg_replace('/[ \t]{2,}/', ' ', $basso);
         foreach ($etichette as $e) {
-            if (preg_match_all('~'.preg_quote($e, '~').'[^\d\n]{0,60}(?:(?:\d{1,2}[\/.\-]\d{1,2}[\/.\-])?\d{4}(?![\d,])[^\d\n]{0,20})?'.self::IMPORTO.'~u', $basso, $m)) {
-                foreach ($m[1] as $v) {
-                    if (null !== ($c = ValoriVoce::centesimi($v))) {
-                        return $c;
-                    }
+            $trovati = [];
+            $sullaRiga = [];
+            if (preg_match_all('~'.preg_quote($e, '~').'[^\d\n]{0,60}(?:(?:\d{1,2}[\/.\-]\d{1,2}[\/.\-])?\d{4}(?![\d,])[^\d\n]{0,20})?'.self::IMPORTO.'~u', $compatto, $m, \PREG_OFFSET_CAPTURE)) {
+                foreach ($m[1] as [$v, $pos]) {
+                    $sullaRiga[$pos] = $v;
                 }
             }
-        }
-        // Negli estratti conto a colonne l'importo sta prima: "31/12/24 1.250,00 SALDO FINALE".
-        foreach ($etichette as $e) {
-            if (preg_match('~'.self::IMPORTO.'[^\d\n]{0,12}'.preg_quote($e, '~').'~u', $basso, $m) && null !== ($c = ValoriVoce::centesimi($m[1]))) {
-                return $c;
+            if (preg_match_all('~'.self::IMPORTO.'[^\d\n]{0,12}'.preg_quote($e, '~').'~u', $compatto, $m, \PREG_OFFSET_CAPTURE)) {
+                foreach ($m[1] as [$v, $pos]) {
+                    $sullaRiga[$pos] = $v;
+                }
+            }
+            ksort($sullaRiga);
+            // Tabelle: l'etichetta nell'intestazione, l'importo nella stessa colonna di una delle 4 righe sotto.
+            $offset = 0;
+            foreach ($righe as $n => $riga) {
+                $col = mb_strpos($riga, $e);
+                // Solo da una riga di intestazione, senza importi: altrimenti è testo, non una tabella.
+                if (false !== $col && !preg_match('~'.self::IMPORTO.'~u', $riga)) {
+                    for ($k = $n + 1; $k <= min($n + 4, \count($righe) - 1); ++$k) {
+                        if (!preg_match_all('~'.self::IMPORTO.'~u', $righe[$k], $mm, \PREG_OFFSET_CAPTURE)) {
+                            continue;
+                        }
+                        foreach ($mm[1] as [$v, $byte]) {
+                            $da = mb_strlen(substr($righe[$k], 0, $byte));
+                            $a = $da + mb_strlen($v);
+                            if ($a >= $col - 8 && $da <= $col + mb_strlen($e) + 12) {
+                                $trovati[$offset + $byte] = $v;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+                $offset += \strlen($riga) + 1;
+            }
+            ksort($trovati);
+            // Prima quelli sulla stessa riga dell'etichetta, poi quelli in colonna.
+            $centesimi = array_values(array_filter(array_map(static fn (string $v) => ValoriVoce::centesimi($v), [...array_values($sullaRiga), ...array_values($trovati)]), static fn ($c) => null !== $c));
+            if ([] !== $centesimi) {
+                return $centesimi;
             }
         }
 
-        return null;
+        return [];
     }
 
     /** IBAN italiani validi (controllo mod 97) nel testo, anche scritti a gruppi. @return list<string> */

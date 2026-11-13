@@ -45,6 +45,7 @@ final class AnalizzaDocumentoPraticaHandler
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
         private readonly DoppioniVoce $doppioni,
+        private readonly CandidatiPratica $candidati,
     ) {
     }
 
@@ -58,7 +59,7 @@ final class AnalizzaDocumentoPraticaHandler
                 continue;
             }
             $modello = $this->modelli->trova($pratica->getModello(), $pratica->getAnno());
-            if (null !== $modello && CandidatiPratica::interessa($modello, $pratica, $d)) {
+            if (null !== $modello && $this->candidati->daGuardare($modello, $pratica, $d)) {
                 $this->bus->dispatch(new AnalizzaDocumentoPraticaMessage((string) $pratica->getId(), (string) $d->getId()));
             }
         }
@@ -73,7 +74,7 @@ final class AnalizzaDocumentoPraticaHandler
             return;
         }
         $modello = $this->modelli->trova($pratica->getModello(), $pratica->getAnno());
-        if (null === $modello || !CandidatiPratica::interessa($modello, $pratica, $documento)
+        if (null === $modello || !$this->candidati->daGuardare($modello, $pratica, $documento)
             || null !== $this->em->find(PraticaAnalisi::class, ['pratica' => $pratica, 'documento' => $documento])) {
             return;
         }
@@ -82,7 +83,7 @@ final class AnalizzaDocumentoPraticaHandler
         $membri = array_values(array_filter($documento->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
         try {
             $testo = (string) $this->documents->readOcrText($documento);
-            $risultato = $this->estrattore->estrai($modello, $documento->getCategoria()->getSlug(), $documento->getNomeFileOriginale(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($modello, $documento));
+            $risultato = $this->estrattore->estrai($modello, $documento->getCategoria()->getSlug(), $documento->getNomeFileOriginale(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, CandidatiPratica::vecchio($modello, $documento, $pratica), $pratica->analizzaTutti());
             unset($testo);
         } catch (\Throwable $e) {
             $this->logger->warning('Pratica {p}: analisi del documento {d} fallita ({reason})', ['p' => $message->praticaId, 'd' => $message->documentoId, 'reason' => $e->getMessage()]);

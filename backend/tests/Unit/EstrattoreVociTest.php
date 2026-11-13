@@ -138,6 +138,40 @@ final class EstrattoreVociTest extends TestCase
         self::assertSame([], $codici('Registro violazioni servitù: auto targa AB123CD parcheggiata', 'registro.xlsx'));
     }
 
+    public function testLabelledAmountsBeatModelValuesFarFromTheLabel(): void
+    {
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        // Estratto conto a tabella: la giacenza è sotto l'intestazione, il saldo finale altrove.
+        $testo = "BANCA DI ESEMPIO\nEstratto conto al 31/12/2024\nIBAN IT60 X054 2811 1010 0000 0123 456\n"
+            ."  31.01.2024                     1.100,00   Saldo finale\n"
+            ."  31.12.2024                     1.250,00   Saldo finale\n\n"
+            ."  TIPO       NUMERO      ANNO      GIACENZA MEDIA      DIVISA\n"
+            ."  RAPPORTO   RAPPORTO\n\n"
+            ."  01         ****1234    2024              987,65      EUR\n";
+        // L'AI scambia il saldo per la giacenza: vale l'importo sotto "GIACENZA MEDIA".
+        $ai = json_encode(['voci' => [['requisito' => 'rapporti', 'tipo' => 'conto', 'persona' => '', 'emittente' => 'BANCA DI ESEMPIO', 'iban' => 'IT60X0542811101000000123456', 'importo' => '1.100,00', 'giacenza' => '1.250,00']]]);
+        $v = $this->estrattore($ai)->estrai($isee, null, 'ec.pdf', $testo, [], null)['voci'][0]['valori'];
+        // Il saldo è l'ultimo "saldo finale" (fine anno), non quello di gennaio.
+        self::assertSame(['1250.00', '987.65'], [$v['importo'], $v['giacenza']]);
+        self::assertSame([123456], TestoVoci::importiVicini('1.234,56 GIACENZA MEDIA ISEE ANNO 2024', ['giacenza media']));
+        // Una visura con due immobili: ogni voce tiene la sua rendita, perché sta accanto all'etichetta.
+        $visura = "Visura catastale\nFoglio 1 particella 2 Rendita euro 247,90\nFoglio 3 particella 4 Rendita euro 512,30";
+        $ai = json_encode(['voci' => [
+            ['requisito' => 'immobili', 'tipo' => 'abitazione_principale', 'persona' => '', 'descrizione' => 'Foglio 1 particella 2', 'importo' => '247,90', 'mutuo_residuo' => ''],
+            ['requisito' => 'immobili', 'tipo' => 'altro_fabbricato', 'persona' => '', 'descrizione' => 'Foglio 3 particella 4', 'importo' => '512,30', 'mutuo_residuo' => ''],
+        ]]);
+        self::assertSame(['247.90', '512.30'], array_map(static fn ($x) => $x['valori']['importo'], $this->estrattore($ai)->estrai($isee, null, 'visura.pdf', $visura, [], null)['voci']));
+    }
+
+    public function testTypeNamedInTheTitleWins(): void
+    {
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        $cu = "ORIGINALE PER IL PERCIPIENTE\nCERTIFICAZIONE\nUNICA 2025\nDATI RELATIVI AL SOSTITUTO D'IMPOSTA\nReddito complessivo 21.000,00\nNote: dati utili per il modello 730";
+        self::assertSame('cu', AiVociSuggeritore::tipoValido($isee->requisito('redditi'), 'dichiarazione_730', $cu));
+        // Senza una frase del tipo nel titolo resta quello dell'AI.
+        self::assertSame('dichiarazione_730', AiVociSuggeritore::tipoValido($isee->requisito('redditi'), 'dichiarazione_730', 'Prospetto di calcolo'));
+    }
+
     public function testTextHelpers(): void
     {
         $lungo = 'Intestazione FARMACIA'.str_repeat(' riempitivo', 500).' Ticket 2,00 TOTALE EURO 14,40'.str_repeat(' fine', 300);

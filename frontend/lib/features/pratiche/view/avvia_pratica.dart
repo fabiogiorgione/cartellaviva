@@ -4,6 +4,7 @@ import 'package:cartellaviva/features/documenti/api/documento_api.dart';
 import 'package:cartellaviva/features/documenti/model/documento.dart' show MembroFamiglia;
 import 'package:cartellaviva/features/pratiche/api/pratiche_api.dart';
 import 'package:cartellaviva/features/pratiche/model/pratica.dart';
+import 'package:cartellaviva/features/pratiche/view/dove_cercare.dart';
 import 'package:cartellaviva/helpers/services/ai_locale.dart';
 import 'package:cartellaviva/helpers/services/api/api_exception.dart';
 import 'package:cartellaviva/layout/navigazione.dart';
@@ -31,6 +32,8 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
   var scelto = liberi.where((m) => m.proposto).firstOrNull ?? liberi.firstOrNull;
   final selezionate = <String>{if (persone.length == 1) persone.first.id};
   var invio = false;
+  AmbitoPratica? ambito;
+  var ambitoValido = true;
   // Contenuto e pulsante in fondo sono due builder separati: ogni scelta li ridisegna entrambi.
   final cambi = ValueNotifier(0);
   void cambia(VoidCallback f) {
@@ -93,6 +96,15 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
                 subtitle: p.relazione == null ? null : Text(p.relazione!),
                 onChanged: (v) => cambia(() => v == true ? selezionate.add(p.id) : selezionate.remove(p.id)),
               ),
+            const SizedBox(height: 12),
+            // Stesso posto nell'albero a ogni ricostruzione: SceltaAmbito tiene le sue scelte.
+            SceltaAmbito(
+              tenantId: tenantId,
+              onChanged: (a, ok) => cambia(() {
+                ambito = a;
+                ambitoValido = ok;
+              }),
+            ),
             if (telefono)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
@@ -105,12 +117,12 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
     azione: (ctx) => ListenableBuilder(
       listenable: cambi,
       builder: (ctx, _) => FilledButton(
-        onPressed: invio || scelto == null || selezionate.isEmpty
+        onPressed: invio || scelto == null || selezionate.isEmpty || !ambitoValido
             ? null
             : () async {
                 cambia(() => invio = true);
                 try {
-                  final p = await PraticheApi.avvia(tenantId, modello: scelto!.modello, anno: scelto!.anno, persone: selezionate.toList(), analisiSu: telefono ? 'telefono' : 'server');
+                  final p = await PraticheApi.avvia(tenantId, modello: scelto!.modello, anno: scelto!.anno, persone: selezionate.toList(), analisiSu: telefono ? 'telefono' : 'server', ambito: ambito);
                   if (ctx.mounted) Navigator.pop(ctx);
                   Get.toNamed('/pratiche/pratica', parameters: {'id': p.id});
                 } on ApiException catch (e) {
@@ -124,3 +136,4 @@ Future<void> avviaPratica(BuildContext context, String tenantId, List<Pratica> e
   );
   cambi.dispose();
 }
+

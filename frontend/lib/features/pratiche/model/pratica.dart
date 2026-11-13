@@ -215,6 +215,37 @@ class RiepilogoPratica {
       );
 }
 
+/// Dove cercare i documenti di una pratica: alcune categorie o etichette; con
+/// [tutti] ognuno di essi va all'analisi, anche senza parole chiave e di ogni anno.
+/// Una pratica senza ambito guarda tutti i documenti della famiglia.
+class AmbitoPratica {
+  /// Id e nome delle categorie.
+  final List<({String id, String nome})> categorie;
+
+  /// Etichette (tag dell'indice dei documenti).
+  final List<String> etichette;
+  final bool tutti;
+
+  const AmbitoPratica({this.categorie = const [], this.etichette = const [], this.tutti = false});
+
+  factory AmbitoPratica.fromJson(Map<String, dynamic> j) => AmbitoPratica(
+        categorie: _lista(j['categorie']).map((c) => (id: c['id'] as String, nome: c['nome'] as String)).toList(),
+        etichette: [for (final e in (j['etichette'] as List? ?? const [])) e as String],
+        tutti: j['tutti'] == true,
+      );
+
+  bool get vuoto => categorie.isEmpty && etichette.isEmpty;
+
+  Map<String, dynamic> toJson() => {'categorie': [for (final c in categorie) c.id], 'etichette': etichette, 'tutti': tutti};
+
+  /// "Banca, ISEE 2026 · etichette: estratto conto · tutti i documenti".
+  String get descrizione => [
+        if (categorie.isNotEmpty) categorie.map((c) => c.nome).join(', '),
+        if (etichette.isNotEmpty) '${etichette.length == 1 ? 'etichetta' : 'etichette'}: ${etichette.join(', ')}',
+        if (tutti) 'li analizzo tutti',
+      ].join(' · ');
+}
+
 /// Una pratica: nell'elenco solo il riassunto; nel dettaglio anche voci, controlli e somme.
 class Pratica {
   final String id, modello, titolo, stato;
@@ -229,6 +260,9 @@ class Pratica {
 
   /// 'server' (Ollama) o 'telefono' (modello Apple sull'iPhone).
   final String analisiSu;
+
+  /// Dove cercare (null: tutti i documenti della famiglia).
+  final AmbitoPratica? ambito;
   final List<VocePratica> voci;
   final List<Mancante> cosaManca;
   final List<AnnoPrima> annoPrima;
@@ -259,6 +293,7 @@ class Pratica {
     this.analisi = (inCoda: 0, analizzati: 0, cifratiInAttesa: 0),
     this.scadenzaRinnovo,
     this.analisiSu = 'server',
+    this.ambito,
   }) : annoRiferimento = annoRiferimento ?? anno;
 
   factory Pratica.fromJson(Map<String, dynamic> j) {
@@ -284,6 +319,7 @@ class Pratica {
       nonServe: _lista(j['nonServe']).map((n) => (requisito: n['requisito'] as String, personaId: _s<String>(n['personaId']), dettaglio: _s<String>(n['dettaglio']))).toList(),
       scadenzaRinnovo: r == null ? null : (id: r['id'] as String, data: DateTime.parse(r['data'] as String)),
       analisiSu: j['analisiSu'] as String? ?? 'server',
+      ambito: _mappa(j['ambito']) == null ? null : AmbitoPratica.fromJson(_mappa(j['ambito'])!),
       voci: _lista(j['voci']).map(VocePratica.fromJson).toList(),
       cosaManca: _lista(j['cosaManca']).map(Mancante.fromJson).toList(),
       annoPrima: _lista(j['annoPrima'])

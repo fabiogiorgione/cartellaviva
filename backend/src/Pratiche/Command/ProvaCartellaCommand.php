@@ -47,6 +47,7 @@ final class ProvaCartellaCommand extends Command
             ->addOption('modello', null, InputOption::VALUE_REQUIRED, 'Modello di pratica', 'isee')
             ->addOption('anno', null, InputOption::VALUE_REQUIRED, 'Anno della pratica')
             ->addOption('attesi', null, InputOption::VALUE_REQUIRED, 'File JSON {"percorso/file.pdf": "requisito" | "nessuno"} con il risultato giusto')
+            ->addOption('tutti', null, InputOption::VALUE_NONE, 'Come "analizza tutti" della pratica: anche i documenti senza parole chiave vanno all\'AI, con tutti i requisiti')
             ->addOption('ai', null, InputOption::VALUE_NONE, 'Chiede anche le voci al modello (lento: da secondi a un minuto per documento)')
             ->addOption('json', null, InputOption::VALUE_REQUIRED, 'Scrive anche il risultato in questo file JSON');
     }
@@ -71,6 +72,7 @@ final class ProvaCartellaCommand extends Command
             }
         }
         $conAi = (bool) $input->getOption('ai');
+        $tutti = (bool) $input->getOption('tutti');
 
         $righe = [];
         $conta = ['giusti' => 0, 'persi' => 0, 'sbagliati' => 0, 'in_piu' => 0, 'senza_atteso' => 0, 'voce_giusta' => 0, 'voce_mancante' => 0];
@@ -86,11 +88,11 @@ final class ProvaCartellaCommand extends Command
             }
             $riga['caratteri'] = mb_strlen(trim($testo));
             $nome = basename($percorso);
-            $riga['candidati'] = array_map(static fn ($r) => $r->codice, EstrattoreVoci::candidati($modello, null, $testo, $nome));
+            $riga['candidati'] = array_map(static fn ($r) => $r->codice, EstrattoreVoci::candidati($modello, null, $testo, $nome, false, $tutti));
             if ($conAi && [] !== $riga['candidati']) {
                 $inizio = microtime(true);
                 try {
-                    foreach ($this->estrattore->estrai($modello, null, $nome, $testo, [], null)['voci'] as $v) {
+                    foreach ($this->estrattore->estrai($modello, null, $nome, $testo, [], null, false, $tutti)['voci'] as $v) {
                         // I valori restano nel JSON (file 0600, fuori dal repository): servono a confrontare i modelli.
                         $riga['voci'][] = ['requisito' => $v['requisito'], 'campi' => array_keys($v['valori']), 'tipo' => $v['valori']['tipo'] ?? null, 'valori' => $v['valori']];
                     }

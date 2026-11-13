@@ -83,6 +83,16 @@ class Pratica implements OwnedResourceInterface
     #[ORM\Column(type: Types::JSON)]
     private array $nonServe = [];
 
+    /**
+     * Dove cercare: null = tutti i documenti della famiglia. Altrimenti i documenti
+     * di una delle categorie o con una delle etichette; con "tutti" ognuno di essi
+     * va all'analisi, anche senza parole chiave e di qualsiasi anno.
+     *
+     * @var array{categorie: list<string>, etichette: list<string>, tutti: bool}|null
+     */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $ambito = null;
+
     /** Promemoria del rinnovo (es. ISEE al 31 dicembre), creato quando la pratica è inviata. */
     #[ORM\ManyToOne(targetEntity: Scadenza::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -202,6 +212,24 @@ class Pratica implements OwnedResourceInterface
     private static function chiaveNonServe(string $requisito, ?MembroFamiglia $persona): string
     {
         return null === $persona ? $requisito : $requisito.'|'.$persona->getId()->toRfc4122();
+    }
+
+    /** @return array{categorie: list<string>, etichette: list<string>, tutti: bool}|null */
+    public function getAmbito(): ?array
+    {
+        return $this->ambito;
+    }
+
+    /** @param array{categorie: list<string>, etichette: list<string>, tutti: bool}|null $ambito */
+    public function setAmbito(?array $ambito): void
+    {
+        $this->ambito = $ambito;
+    }
+
+    /** Ogni documento dell'ambito va all'analisi (scelti a mano: niente filtri su parole e anni). */
+    public function analizzaTutti(): bool
+    {
+        return true === ($this->ambito['tutti'] ?? false);
     }
 
     public function getAnalisiSu(): string

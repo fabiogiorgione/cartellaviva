@@ -21,8 +21,8 @@ class PraticheApi {
         return (pratiche: (r.data['pratiche'] as List).map((j) => Pratica.fromJson(_m(j))).toList(), puoAvviare: r.data['puoAvviare'] == true);
       });
 
-  static Future<Pratica> avvia(String t, {required String modello, required int anno, required List<String> persone, String analisiSu = 'server'}) => chiamaApi(() async {
-        final r = await _dio.post('/tenants/$t/pratiche', data: {'modello': modello, 'anno': anno, 'persone': persone, 'analisiSu': analisiSu});
+  static Future<Pratica> avvia(String t, {required String modello, required int anno, required List<String> persone, String analisiSu = 'server', AmbitoPratica? ambito}) => chiamaApi(() async {
+        final r = await _dio.post('/tenants/$t/pratiche', data: {'modello': modello, 'anno': anno, 'persone': persone, 'analisiSu': analisiSu, 'ambito': ambito?.toJson()});
         return Pratica.fromJson(_m(r.data));
       });
 
@@ -30,6 +30,12 @@ class PraticheApi {
 
   static Future<Pratica> modifica(String t, String id, {String? stato, List<String>? persone, String? analisiSu}) => chiamaApi(() async {
         final r = await _dio.patch('/tenants/$t/pratiche/$id', data: {if (stato != null) 'stato': stato, if (persone != null) 'persone': persone, if (analisiSu != null) 'analisiSu': analisiSu});
+        return Pratica.fromJson(_m(r.data));
+      });
+
+  /// Dove cercare: null = tutti i documenti. Riparte la ricerca sui documenti nuovi dell'ambito.
+  static Future<Pratica> modificaAmbito(String t, String id, AmbitoPratica? ambito) => chiamaApi(() async {
+        final r = await _dio.patch('/tenants/$t/pratiche/$id', data: {'ambito': ambito?.toJson()});
         return Pratica.fromJson(_m(r.data));
       });
 

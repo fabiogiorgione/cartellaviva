@@ -5,6 +5,7 @@ namespace App\Pratiche;
 use App\Account\Entity\User;
 use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
+use App\Documenti\Repository\CategoriaRepository;
 use App\Documenti\Repository\DocumentoRepository;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Entity\PraticaAnalisi;
@@ -52,6 +53,7 @@ class PraticheService
         private readonly EstrattoreVoci $estrattore,
         private readonly DocumentService $testi,
         private readonly DoppioniVoce $doppioni,
+        private readonly CategoriaRepository $categorie,
     ) {
     }
 
@@ -81,6 +83,7 @@ class PraticheService
         $pratica = new Pratica($tenant, $chi, $codice, $anno, $chiave['wrapped'], $chiave['version'], $id);
         $pratica->replacePersone($persone);
         $pratica->setAnalisiSu(\is_string($dati['analisiSu'] ?? null) ? $dati['analisiSu'] : Pratica::ANALISI_SERVER);
+        $pratica->setAmbito($this->ambito($tenant, $dati['ambito'] ?? null));
         $this->em->persist($pratica);
         $this->em->flush();
         $this->log('pratica.avviata', $pratica, ['modello' => $codice, 'anno' => $anno, 'persone' => \count($persone), 'analisiSu' => $pratica->getAnalisiSu()]);
@@ -89,7 +92,47 @@ class PraticheService
         return $pratica;
     }
 
-    /** @param array<string, mixed> $dati {stato?, persone?} */
+    /**
+     * Dove cercare: null (o niente) = tutti i documenti. Altrimenti categorie
+     * della famiglia (id) ed etichette dell'indice, almeno una delle due.
+     *
+     * @return array{categorie: list<string>, etichette: list<string>, tutti: bool}|null
+     */
+    private function ambito(Tenant $tenant, mixed $dati): ?array
+    {
+        if (null === $dati) {
+            return null;
+        }
+        if (!\is_array($dati)) {
+            throw new DatiNonValidi('ambito: {categorie, etichette, tutti} oppure null.');
+        }
+        $categorie = [];
+        foreach ((array) ($dati['categorie'] ?? []) as $id) {
+            $c = \is_string($id) && Uuid::isValid($id) ? $this->categorie->findUsableById($tenant, $id) : null;
+            if (null === $c) {
+                throw new DatiNonValidi('ambito: una delle categorie non è di questa famiglia.');
+            }
+            $categorie[(string) $c->getId()] = true;
+        }
+        $etichette = [];
+        foreach ((array) ($dati['etichette'] ?? []) as $e) {
+            $e = \is_string($e) ? trim($e) : '';
+            if ('' === $e || mb_strlen($e) > 30) {
+                throw new DatiNonValidi('ambito: etichette non valide.');
+            }
+            $etichette[$e] = true;
+        }
+        if ([] === $categorie && [] === $etichette) {
+            throw new DatiNonValidi('Scegli almeno una categoria o un\'etichetta, oppure cerca in tutti i documenti.');
+        }
+        if (\count($categorie) + \count($etichette) > 60) {
+            throw new DatiNonValidi('ambito: troppe categorie ed etichette.');
+        }
+
+        return ['categorie' => array_keys($categorie), 'etichette' => array_map('strval', array_keys($etichette)), 'tutti' => true === ($dati['tutti'] ?? false)];
+    }
+
+    /** @param array<string, mixed> $dati {stato?, persone?, analisiSu?, ambito?} */
     public function aggiorna(Pratica $pratica, User $chi, array $dati): void
     {
         $campi = [];
@@ -103,6 +146,13 @@ class PraticheService
             }
             $pratica->setAnalisiSu($dati['analisiSu']);
             $campi[] = 'analisiSu';
+        }
+        if (\array_key_exists('ambito', $dati)) {
+            $pratica->setAmbito($this->ambito($pratica->getTenant(), $dati['ambito']));
+            // Con un ambito nuovo si riguardano i documenti scartati o senza voci:
+            // le voci già trovate restano, i doppioni non si ripropongono (DoppioniVoce).
+            $this->em->getConnection()->executeStatement("DELETE FROM pratica_analisi WHERE pratica_id = :p AND esito IN ('nessuna', 'errore')", ['p' => $pratica->getId()->toRfc4122()]);
+            $campi[] = 'ambito';
         }
         if (\array_key_exists('stato', $dati)) {
             $stato = \is_string($dati['stato']) ? PraticaStato::tryFrom($dati['stato']) : null;
@@ -118,7 +168,7 @@ class PraticheService
         }
         $this->em->flush();
         $this->log($inviata ? 'pratica.inviata' : 'pratica.modificata', $pratica, ['campi' => $campi]);
-        if (\in_array('persone', $campi, true) || \in_array('analisiSu', $campi, true) || PraticaStato::IN_CORSO === $pratica->getStato()) {
+        if (\in_array('persone', $campi, true) || \in_array('analisiSu', $campi, true) || \in_array('ambito', $campi, true) || PraticaStato::IN_CORSO === $pratica->getStato()) {
             $this->analizza($pratica);
         }
     }
@@ -209,7 +259,7 @@ class PraticheService
                 continue;
             }
             $testo = (string) $this->testi->readOcrText($d);
-            $requisiti = '' === trim($testo) ? [] : EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
+            $requisiti = '' === trim($testo) ? [] : EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d, $pratica), $pratica->analizzaTutti());
             if ([] === $requisiti) {
                 // Cifrato senza parole utili: niente da chiedere al telefono.
                 $this->registraAnalisi($pratica, $d, PraticaAnalisi::NESSUNA, 'regole');
@@ -241,7 +291,7 @@ class PraticheService
     {
         $modello = $this->modello($pratica);
         $d = $this->documento($pratica->getTenant(), $dati['documentoId'] ?? null);
-        if (null === $d || !CandidatiPratica::interessa($modello, $pratica, $d) || \in_array($d->getId()->toRfc4122(), $this->pratiche->documentiAnalizzati($pratica), true)) {
+        if (null === $d || !$this->candidati->daGuardare($modello, $pratica, $d) || \in_array($d->getId()->toRfc4122(), $this->pratiche->documentiAnalizzati($pratica), true)) {
             throw new Conflitto('Questo documento non è da analizzare (o è già stato analizzato).');
         }
         $versione = mb_substr(preg_replace('/[^\w.\-]/', '', (string) ($dati['modello'] ?? 'apple')) ?: 'apple', 0, 11);
@@ -254,7 +304,7 @@ class PraticheService
         $testo = (string) $this->testi->readOcrText($d);
         $persone = $pratica->getPersone();
         $membri = array_values(array_filter($d->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
-        $voci = $this->estrattore->daGrezze($modello, $d->getCategoria()->getSlug(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, AiVociSuggeritore::vociDaJson($risposta), $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d));
+        $voci = $this->estrattore->daGrezze($modello, $d->getCategoria()->getSlug(), $testo, $persone, 1 === \count($membri) ? $membri[0] : null, AiVociSuggeritore::vociDaJson($risposta), $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d, $pratica), $pratica->analizzaTutti());
         $voci = $this->doppioni->nuove($modello, $pratica, $voci);
         unset($testo);
         foreach ($voci as $v) {

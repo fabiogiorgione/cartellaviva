@@ -7,6 +7,8 @@ use App\Documenti\Enum\OcrStatus;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Modello\ModelloPratica;
 use App\Pratiche\Modello\Requisito;
+use App\Documenti\Indice\IndiceDocumenti;
+use Symfony\Component\Uid\Uuid;
 use App\Pratiche\Repository\PraticaRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -21,6 +23,9 @@ use Doctrine\ORM\EntityManagerInterface;
  *   d'identità, libretto, visura).
  * - In chiaro: parole chiave di un requisito nel testo o nel nome del file
  *   (la categoria da sola no).
+ * - Ambito della pratica (se scelto): solo i documenti di alcune categorie o
+ *   con alcune etichette; con "analizza tutti" ognuno di essi, di ogni anno e
+ *   anche senza parole chiave.
  * - Cifrati: solo con il consenso della pratica, e solo nelle categorie dei
  *   requisiti o "Da categorizzare" (le parole chiave si controllano dopo,
  *   leggendo il testo in memoria). Senza consenso si contano e basta.
@@ -32,7 +37,51 @@ class CandidatiPratica
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PraticaRepository $pratiche,
+        private readonly IndiceDocumenti $indice,
     ) {
+    }
+
+    /**
+     * Il documento è da guardare per questa pratica: nell'ambito scelto e, se
+     * non si analizza tutto, con le regole di interessa().
+     *
+     * @param array<string, true>|null $etichettati documenti con le etichette dell'ambito (etichettati()), se già calcolati
+     */
+    public function daGuardare(ModelloPratica $modello, Pratica $pratica, Documento $d, ?array $etichettati = null): bool
+    {
+        return $this->nelAmbito($pratica, $d, $etichettati) && self::interessa($modello, $pratica, $d);
+    }
+
+    /** @param array<string, true>|null $etichettati */
+    public function nelAmbito(Pratica $pratica, Documento $d, ?array $etichettati = null): bool
+    {
+        $ambito = $pratica->getAmbito();
+        if (null === $ambito) {
+            return true;
+        }
+        if (\in_array((string) $d->getCategoria()->getId(), $ambito['categorie'], true)) {
+            return true;
+        }
+
+        return isset(($etichettati ?? $this->etichettati($pratica))[$d->getId()->toRfc4122()]);
+    }
+
+    /**
+     * Documenti con una delle etichette dell'ambito (i tag dell'indice: solo
+     * documenti in chiaro).
+     *
+     * @return array<string, true> id => true
+     */
+    public function etichettati(Pratica $pratica): array
+    {
+        $ids = [];
+        foreach ($pratica->getAmbito()['etichette'] ?? [] as $etichetta) {
+            foreach ($this->indice->documentiCon($pratica->getTenant(), 'tag', $etichetta) as $id) {
+                $ids[Uuid::fromString($id)->toRfc4122()] = true;
+            }
+        }
+
+        return $ids;
     }
 
     /** @return list<string> slug delle categorie che interessano al modello */
@@ -46,11 +95,17 @@ class CandidatiPratica
         return array_values(array_unique($slug));
     }
 
-    /** Il documento è da guardare per questa pratica? (senza decifrare nulla) */
+    /**
+     * Il documento è da guardare per questa pratica? (senza decifrare nulla; l'ambito
+     * lo controlla daGuardare). Con "analizza tutti" basta l'OCR, e per i cifrati il consenso.
+     */
     public static function interessa(ModelloPratica $modello, Pratica $pratica, Documento $d): bool
     {
         if (OcrStatus::COMPLETATO !== $d->getOcrStatus()) {
             return false;
+        }
+        if ($pratica->analizzaTutti()) {
+            return !$d->isCifrato() || $pratica->haConsensoCifrati();
         }
         $vecchio = self::vecchio($modello, $d);
         if (!$vecchio && !self::nellaFinestra($modello, $d)) {
@@ -84,8 +139,12 @@ class CandidatiPratica
      * Più vecchio della finestra: vale solo per i requisiti "ancheVecchi" (la
      * carta d'identità, il libretto dell'auto, la visura non scadono con l'anno).
      */
-    public static function vecchio(ModelloPratica $modello, Documento $d): bool
+    public static function vecchio(ModelloPratica $modello, Documento $d, ?Pratica $pratica = null): bool
     {
+        // Documenti scelti a mano ("analizza tutti"): ogni anno vale.
+        if (true === $pratica?->analizzaTutti()) {
+            return false;
+        }
         $da = $modello->finestra()[0];
 
         return ($d->getDataDocumento() ?? $d->getCreatedAt()) < $da;
@@ -105,16 +164,17 @@ class CandidatiPratica
             return [];
         }
         $out = [];
+        $etichettati = $this->etichettati($pratica);
         foreach ($this->finestra($modello, $pratica) as $d) {
-            if ($d->isCifrato()) {
+            if ($d->isCifrato() || !$this->nelAmbito($pratica, $d, $etichettati)) {
                 continue;
             }
             $testo = (string) $d->getOcrText();
             $basso = Requisito::normale($testo);
             $nome = Requisito::nomeNormale($d->getNomeFileOriginale());
-            $vecchio = self::vecchio($modello, $d);
+            $vecchio = self::vecchio($modello, $d, $pratica);
             foreach ($daScoprire as $r) {
-                if (($vecchio && !$r->ancheVecchi) || (!$r->parlaDi($basso, $nome) && !\in_array($d->getCategoria()->getSlug(), $r->categorie, true))) {
+                if (($vecchio && !$r->ancheVecchi) || (!$pratica->analizzaTutti() && !$r->parlaDi($basso, $nome) && !\in_array($d->getCategoria()->getSlug(), $r->categorie, true))) {
                     continue;
                 }
                 foreach ('iban' === $r->scopri ? TestoVoci::iban($testo) : TestoVoci::targhe($testo) as $codice) {
@@ -136,9 +196,13 @@ class CandidatiPratica
         $fatti = 0;
         $inAttesa = 0;
         $categorie = [...self::categorie($modello), ...self::SEMPRE_CIFRATI];
+        $etichettati = $this->etichettati($pratica);
         foreach ($this->finestra($modello, $pratica) as $d) {
+            if (!$this->nelAmbito($pratica, $d, $etichettati)) {
+                continue;
+            }
             if ($d->isCifrato() && !$pratica->haConsensoCifrati()) {
-                if (\in_array($d->getCategoria()->getSlug(), $categorie, true)) {
+                if ($pratica->analizzaTutti() || \in_array($d->getCategoria()->getSlug(), $categorie, true)) {
                     ++$inAttesa;
                 }
                 continue;
@@ -163,8 +227,11 @@ class CandidatiPratica
     private function finestra(ModelloPratica $modello, Pratica $pratica): array
     {
         [$da, $a] = $modello->finestra();
-        if ($modello->guardaAncheVecchi()) {
+        if ($modello->guardaAncheVecchi() || $pratica->analizzaTutti()) {
             $da = new \DateTimeImmutable('1900-01-01');
+        }
+        if ($pratica->analizzaTutti()) {
+            $a = new \DateTimeImmutable('2999-12-31');
         }
 
         /** @var list<Documento> $documenti */

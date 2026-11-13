@@ -397,6 +397,26 @@ final class PraticaController extends AbstractController
             'analisi' => ['inCoda' => \count($stato['daAnalizzare']), 'analizzati' => $stato['analizzati'], 'cifratiInAttesa' => $stato['cifratiInAttesa']],
             'puoGestire' => $this->access->isGranted('pratica:manage', $p),
             'analisiSu' => $p->getAnalisiSu(),
+            'ambito' => $this->vistaAmbito($p),
         ];
+    }
+
+    /** @return array{categorie: list<array{id: string, nome: string}>, etichette: list<string>, tutti: bool}|null */
+    private function vistaAmbito(Pratica $p): ?array
+    {
+        $a = $p->getAmbito();
+        if (null === $a) {
+            return null;
+        }
+        $categorie = [];
+        foreach ($a['categorie'] as $id) {
+            $c = $this->categorie->findUsableById($p->getTenant(), $id);
+            // Una categoria cancellata nel frattempo semplicemente non conta più.
+            if (null !== $c) {
+                $categorie[] = ['id' => (string) $c->getId(), 'nome' => $c->getNome()];
+            }
+        }
+
+        return ['categorie' => $categorie, 'etichette' => $a['etichette'], 'tutti' => $a['tutti']];
     }
 }

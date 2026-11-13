@@ -8,6 +8,7 @@ use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Event\DocumentoOcrCompletatoEvent;
 use App\Pratiche\AiVociSuggeritore;
+use App\Pratiche\CandidatiPratica;
 use App\Pratiche\DoppioniVoce;
 use App\Pratiche\EstrattoreVoci;
 use App\Pratiche\Message\AnalizzaDocumentoPraticaMessage;
@@ -330,6 +331,52 @@ final class PraticaTest extends ApiTestCase
         self::assertSame([], array_filter($this->dettaglio($r['id'])['cosaManca'], static fn ($m) => 'rapporti' === $m['requisito'] && null !== $m['dettaglio']));
     }
 
+    public function testScopeLimitsDocumentsAndAnalyzeAllIgnoresKeywordsAndYears(): void
+    {
+        // Una cartella preparata a mano: due documenti senza parole chiave, uno vecchio.
+        $cartella = $this->request('POST', $this->url('/categorie'), ['nome' => 'ISEE da fare', 'icona' => 'folder', 'colore' => '#336699'], $this->token);
+        $this->assertStatus(201);
+        $scelto = $this->documento('casa', 'lettera.png', "Gentile cliente,\nle comunichiamo il valore del suo deposito: 1.500,00 euro.", '2019-04-01');
+        $this->em()->getConnection()->executeStatement('UPDATE documento SET categoria_id = :c WHERE id = :d', ['c' => $cartella['id'], 'd' => $scelto]);
+        // Fuori dalla cartella: un estratto conto che normalmente verrebbe analizzato.
+        $banca = $this->documento('casa', 'banca.png', "Estratto conto\nIBAN IT60 X054 2811 1010 0000 0123 456\nSaldo contabile al 31/12/2024 euro 3.210,55", '2025-02-10');
+
+        $this->request('POST', $this->url('/pratiche'), ['modello' => 'isee', 'anno' => 2026, 'persone' => [$this->id($this->mario)], 'ambito' => ['categorie' => [], 'etichette' => []]], $this->token);
+        $this->assertStatus(422);
+        $this->request('POST', $this->url('/pratiche'), ['modello' => 'isee', 'anno' => 2026, 'persone' => [$this->id($this->mario)], 'ambito' => ['categorie' => [(string) Uuid::v7()]]], $this->token);
+        $this->assertStatus(422);
+
+        $r = $this->request('POST', $this->url('/pratiche'), ['modello' => 'isee', 'anno' => 2026, 'persone' => [$this->id($this->mario)], 'ambito' => ['categorie' => [$cartella['id']], 'etichette' => [], 'tutti' => false]], $this->token);
+        $this->assertStatus(201);
+        $p = $this->dettaglio($r['id']);
+        self::assertSame([['id' => $cartella['id'], 'nome' => 'ISEE da fare']], $p['ambito']['categorie']);
+        // Solo la cartella, e con le regole normali: la lettera non ha parole chiave ed è vecchia.
+        self::assertSame(0, $p['analisi']['inCoda'] + $p['analisi']['analizzati']);
+
+        // "Analizza tutti": la lettera va all'analisi anche senza parole chiave e del 2019.
+        $p = $this->request('PATCH', $this->url("/pratiche/{$r['id']}"), ['ambito' => ['categorie' => [$cartella['id']], 'tutti' => true]], $this->token);
+        $this->assertStatus(200);
+        $sent = array_values(array_filter($this->queue()->getSent(), static fn ($e) => $e->getMessage() instanceof AnalizzaDocumentoPraticaMessage));
+        self::assertSame([$scelto], array_map(static fn ($e) => $e->getMessage()->documentoId, $sent));
+        $p = $this->dettaglio($r['id']);
+        self::assertTrue($p['ambito']['tutti']);
+        self::assertSame(1, $p['analisi']['inCoda']);
+
+        // Per etichetta (i tag dell'indice): l'estratto conto ha "banca".
+        $this->em()->getConnection()->executeStatement("INSERT INTO documento_indice (documento_id, tenant_id, dati, tag, riferimenti, aggiornato_il) VALUES (:d, :t, '{}', '[\"banca\"]', '[]', NOW())", ['d' => $banca, 't' => $this->tid()]);
+        $this->request('PATCH', $this->url("/pratiche/{$r['id']}"), ['ambito' => ['etichette' => ['banca']]], $this->token);
+        $this->assertStatus(200);
+        $p = $this->dettaglio($r['id']);
+        self::assertSame([[], ['banca'], false], [$p['ambito']['categorie'], $p['ambito']['etichette'], $p['ambito']['tutti']]);
+        self::assertSame(1, $p['analisi']['inCoda'] + $p['analisi']['analizzati']);
+
+        // Di nuovo tutti i documenti: torna anche l'estratto conto.
+        $this->request('PATCH', $this->url("/pratiche/{$r['id']}"), ['ambito' => null], $this->token);
+        $p = $this->dettaglio($r['id']);
+        self::assertNull($p['ambito']);
+        self::assertSame(1, $p['analisi']['inCoda']);
+    }
+
     public function testPhoneAnalysisGetsJobsAndOnlyCheckedValuesAreSaved(): void
     {
         $visita = $this->documento('casa', 'visita.png', self::VISITA, '2025-06-05');
@@ -463,6 +510,7 @@ final class PraticaTest extends ApiTestCase
             $c->get(MessageBusInterface::class),
             new NullLogger(),
             $c->get(DoppioniVoce::class),
+            $c->get(CandidatiPratica::class),
         );
     }
 

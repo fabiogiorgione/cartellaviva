@@ -43,7 +43,7 @@ class EstrattoreVoci
      *
      * @return list<Requisito>
      */
-    public static function candidati(ModelloPratica $modello, ?string $categoriaSlug, string $testo, string $nomeFile = '', bool $vecchio = false): array
+    public static function candidati(ModelloPratica $modello, ?string $categoriaSlug, string $testo, string $nomeFile = '', bool $vecchio = false, bool $tutti = false): array
     {
         $basso = Requisito::normale($testo);
         $nome = Requisito::nomeNormale($nomeFile);
@@ -58,6 +58,11 @@ class EstrattoreVoci
             }
         }
         arsort($punteggi);
+        // Documento scelto a mano senza parole chiave: decide l'AI tra tutti i requisiti.
+        // Le esclusioni valgono anche qui (un'attestazione fiscale non è una polizza da dichiarare).
+        if ([] === $punteggi && $tutti) {
+            return array_values(array_filter($modello->requisiti, static fn (Requisito $r) => !$r->escluso($basso, $nome)));
+        }
 
         return array_map(static fn (string $c) => $modello->requisiti[$c], array_keys($punteggi));
     }
@@ -67,9 +72,9 @@ class EstrattoreVoci
      *
      * @return array{metodo: string, voci: list<array{requisito: string, persona: ?MembroFamiglia, valori: array<string, string>}>}
      */
-    public function estrai(ModelloPratica $modello, ?string $categoriaSlug, string $nomeFile, string $testo, array $persone, ?MembroFamiglia $personaDocumento, bool $vecchio = false): array
+    public function estrai(ModelloPratica $modello, ?string $categoriaSlug, string $nomeFile, string $testo, array $persone, ?MembroFamiglia $personaDocumento, bool $vecchio = false, bool $tutti = false): array
     {
-        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio);
+        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio, $tutti);
         if ([] === $candidati) {
             return ['metodo' => 'regole', 'voci' => []];
         }
@@ -89,7 +94,7 @@ class EstrattoreVoci
             $grezze = $candidati[0]->parlaDi(Requisito::normale($testo), Requisito::nomeNormale($nomeFile)) ? [['requisito' => $candidati[0]->codice]] : [];
         }
 
-        return ['metodo' => $metodo, 'voci' => $this->daGrezze($modello, $categoriaSlug, $testo, $persone, $personaDocumento, $grezze, $nomeFile, $vecchio)];
+        return ['metodo' => $metodo, 'voci' => $this->daGrezze($modello, $categoriaSlug, $testo, $persone, $personaDocumento, $grezze, $nomeFile, $vecchio, $tutti)];
     }
 
     /**
@@ -101,9 +106,9 @@ class EstrattoreVoci
      *
      * @return list<array{requisito: string, persona: ?MembroFamiglia, valori: array<string, string>}>
      */
-    public function daGrezze(ModelloPratica $modello, ?string $categoriaSlug, string $testo, array $persone, ?MembroFamiglia $personaDocumento, array $grezze, string $nomeFile = '', bool $vecchio = false): array
+    public function daGrezze(ModelloPratica $modello, ?string $categoriaSlug, string $testo, array $persone, ?MembroFamiglia $personaDocumento, array $grezze, string $nomeFile = '', bool $vecchio = false, bool $tutti = false): array
     {
-        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio);
+        $candidati = self::candidati($modello, $categoriaSlug, $testo, $nomeFile, $vecchio, $tutti);
         $voci = [];
         $viste = [];
         foreach ($grezze as $g) {
@@ -190,8 +195,22 @@ class EstrattoreVoci
     private function importo(Campo $campo, ?string $ai, string $testo, bool $primo): ?string
     {
         $c = ValoriVoce::centesimi($ai);
-        if (null === $c || !TestoVoci::importoNelTesto($c, $testo)) {
-            $c = [] !== $campo->etichette ? TestoVoci::importoDopo($testo, $campo->etichette) : ($primo ? TestoVoci::importoTotale($testo) : null);
+        if (null !== $c && !TestoVoci::importoNelTesto($c, $testo)) {
+            $c = null;
+        }
+        if ([] !== $campo->etichette) {
+            // Con le etichette (giacenza, saldo, rendita) il valore dell'AI vale solo se sta
+            // vicino a una di esse: un modello piccolo scambia facilmente il saldo per la
+            // giacenza. Altrimenti vale l'importo trovato accanto all'etichetta.
+            // Con "ultimo" (il saldo di fine anno) vale sempre l'ultimo importo accanto all'etichetta.
+            $vicini = TestoVoci::importiVicini($testo, $campo->etichette);
+            if ($campo->ultimo && [] !== $vicini) {
+                $c = $vicini[\count($vicini) - 1];
+            } elseif ([] !== $vicini && (null === $c || !\in_array($c, $vicini, true))) {
+                $c = $vicini[0];
+            }
+        } elseif (null === $c && $primo) {
+            $c = TestoVoci::importoTotale($testo);
         }
 
         return null === $c ? null : ValoriVoce::formatta($c);

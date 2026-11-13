@@ -91,12 +91,10 @@ final class Requisito
      */
     public function parlaDi(string $testoNormale, string $nomeNormale = ''): bool
     {
-        $tutto = '' === $nomeNormale ? $testoNormale : $nomeNormale."\n".$testoNormale;
-        foreach ($this->senza as $parola) {
-            if (self::contiene($tutto, $parola)) {
-                return false;
-            }
+        if ($this->escluso($testoNormale, $nomeNormale)) {
+            return false;
         }
+        $tutto = '' === $nomeNormale ? $testoNormale : $nomeNormale."\n".$testoNormale;
         foreach ($this->parole as $parola) {
             if (self::contiene($tutto, $parola)) {
                 return true;
@@ -104,6 +102,19 @@ final class Requisito
         }
         foreach ($this->nomi as $nome) {
             if ('' !== $nomeNormale && 1 === preg_match('~(?<![\p{L}\p{N}])'.preg_quote($nome, '~').'(?![\p{L}\p{N}])~u', $nomeNormale)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Il documento contiene una delle parole "senza" (non è di questo requisito)? */
+    public function escluso(string $testoNormale, string $nomeNormale = ''): bool
+    {
+        $tutto = '' === $nomeNormale ? $testoNormale : $nomeNormale."\n".$testoNormale;
+        foreach ($this->senza as $parola) {
+            if (self::contiene($tutto, $parola)) {
                 return true;
             }
         }

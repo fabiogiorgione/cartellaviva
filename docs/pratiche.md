@@ -242,6 +242,22 @@ Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, pr
 - **Prima i documenti più recenti** (`CandidatiPratica`): tra due copie resta la proposta del documento più nuovo.
 - Il documento d'identità esclude i curriculum (citano la patente); i veicoli non si riconoscono più dalla sola parola "targa" (bastava un foglio sulla servitù di un parcheggio).
 
+**Valori più affidabili** (13/11/2026, dal confronto di qwen3 4B, qwen3 8B e gemma3 12B sul banco di prova: i modelli più grandi non risolvono, e scambiano anche loro il saldo per la giacenza):
+
+- **Importi con etichetta** (`TestoVoci::importiVicini`, `EstrattoreVoci::importo`): il valore dell'AI vale solo se sta accanto a un'etichetta del campo (dopo, prima, o nella stessa colonna di una tabella con l'intestazione); altrimenti vale l'importo trovato accanto all'etichetta. Così una visura con più immobili tiene una rendita per voce. Gli spazi di allineamento non contano per l'etichetta sulla stessa riga.
+- **`ultimo: true`** sul campo: tra più importi accanto all'etichetta vale l'ultimo (il saldo di fine anno in un estratto con i saldi mensili; il valore del capitale di fine periodo di una polizza).
+- **Tipo dal titolo** (`AiVociSuggeritore::tipoValido`): una frase di un tipo nei primi 1.500 caratteri o nel nome del file vince sul tipo dell'AI ("Certificazione Unica" in testa è una CU anche se l'AI dice 730). Solo frasi di più parole: "farmac" in cima a uno scontrino è il nome della farmacia.
+
+### Dove cercare: categorie, etichette, analizza tutti (13/11/2026)
+
+Ogni pratica può limitare la ricerca (`Pratica::ambito`, JSON): documenti di **una delle categorie** o con **una delle etichette** (i tag dell'indice dei documenti, solo per i documenti in chiaro). Senza ambito si guardano tutti i documenti della famiglia, come prima.
+
+Con **"Analizza tutti"** ogni documento dell'ambito va all'analisi, di qualsiasi anno e anche senza parole chiave: se nessun requisito lo riconosce, l'AI riceve tutti i requisiti, tranne quelli esclusi dalle parole `senza` (un'attestazione ISEE o un'attestazione fiscale non diventano voci). I controlli sui valori (importi, date dell'anno giusto, doppioni) restano. I cifrati vogliono sempre il consenso.
+
+- API: `ambito` in `POST /pratiche` e `PATCH /pratiche/{id}` (`{categorie: [id], etichette: [testo], tutti: bool}` o `null`); nel dettaglio con i nomi delle categorie. Cambiandolo si riguardano i documenti analizzati senza voci; le voci già trovate restano.
+- App: sezione "Dove cercare" nel foglio "Avvia una pratica" (categorie ed etichette con il numero di documenti, dalle faccette dell'elenco) e voce "Dove cercare…" nel menu della pratica; in cima alla pratica "Cerca solo in: …" con "Cambia".
+- Banco di prova: `--tutti`. Sulla cartella ISEE 2026: nessuna proposta inutile, le stesse voci giuste.
+
 **Limiti noti.** Le regole sono state corrette guardando una sola cartella (ISEE 2026 di una famiglia): il risultato su quella cartella non è una misura indipendente, servono altre cartelle. Tesseract non legge alcune foto di tessere con nessuna impostazione provata: lì resta solo il nome del file. Il modello a volte sbaglia il tipo (una CU proposta come 730).
 
 ### Modello 730
