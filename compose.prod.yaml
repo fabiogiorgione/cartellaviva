@@ -73,11 +73,16 @@ services:
       - jwt_keys:/app/config/jwt
       - caddy_data:/data
       - caddy_config:/config
+    # Tetto di memoria: se un picco lo supera si riavvia solo questo container, non la VM.
+    mem_limit: 1g
 
   # Lavori asincroni (OCR, anteprime, AI) e attività pianificate (promemoria, pulizie).
   worker:
     <<: *backend
     command: ["php", "-d", "memory_limit=512M", "bin/console", "messenger:consume", "async", "scheduler_default", "--time-limit=3600", "--memory-limit=256M", "-vv"]
+    # Tetto di memoria per PHP più OCR e conversioni (tesseract, ImageMagick): un documento
+    # pesante fa riavviare solo il worker, e il messaggio torna in coda.
+    mem_limit: 1536m
     # L'healthcheck dell'immagine controlla Caddy, che nel worker non gira.
     healthcheck:
       test: ["CMD", "grep", "-q", "messenger:consume", "/proc/1/cmdline"]

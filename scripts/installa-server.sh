@@ -94,6 +94,29 @@ if [ "$(uname -s)" = Linux ] && [ "$UTENTE" = 0 ]; then
   chown 1000:1000 secrets secrets/master_key
 fi
 
+# --- Swap: margine di memoria ------------------------------------------------------------
+# Il modello AI usa gran parte della RAM: senza swap un picco blocca tutta la VM invece di
+# rallentarla. Su Linux, se non c'è swap attivo, crea /swapfile (4 GB) e lo rende permanente;
+# swappiness bassa: si usa solo quando la RAM finisce. Serve sudo senza password, altrimenti
+# lo script lo segnala e prosegue (docs/installazione-server.md, "Swap").
+if [ "$(uname -s)" = Linux ] && [ -z "$(swapon --noheadings 2>/dev/null)" ]; then
+  passo "Creo lo swap (4 GB in /swapfile)"
+  if sudo -n true 2>/dev/null; then
+    if [ ! -f /swapfile ]; then
+      sudo -n fallocate -l 4G /swapfile || sudo -n dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none
+      sudo -n chmod 600 /swapfile
+      sudo -n mkswap /swapfile >/dev/null
+    fi
+    sudo -n swapon /swapfile
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo -n tee -a /etc/fstab >/dev/null
+    echo 'vm.swappiness=10' | sudo -n tee /etc/sysctl.d/90-cartellaviva-swap.conf >/dev/null
+    sudo -n sysctl -q -p /etc/sysctl.d/90-cartellaviva-swap.conf
+    echo "Swap attivo: $(swapon --noheadings --show=NAME,SIZE | tr -s ' ')"
+  else
+    echo "ATTENZIONE: nessuno swap e niente sudo senza password: crealo a mano (docs/installazione-server.md, \"Swap\")."
+  fi
+fi
+
 # --- Immagini e avvio -----------------------------------------------------------------
 passo "Costruisco le immagini (la prima volta anche l'app web: alcuni minuti)"
 docker compose build --pull
