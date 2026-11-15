@@ -1,6 +1,6 @@
 # Connettore AI per Mac
 
-Specifica del 14/11/2026. Stato: fasi 0, 1 (backend) e 2 (app) fatte il 15/11/2026; connettore macOS (fase 3) da fare.
+Specifica del 14/11/2026. Stato: fasi 0, 1 (backend) e 2 (app) fatte il 15/11/2026; fase 3 (connettore macOS) prima versione funzionante, mancano distribuzione e aggiornamenti.
 
 Un'app per macOS che esegue sul Mac della famiglia, con Ollama o con il modello di Apple, le analisi che oggi fa la VM. Il connettore si collega al server, prende i lavori e restituisce **solo i valori letti dal modello**; il server li ricontrolla con le stesse regole di sempre. Se il Mac è spento, il lavoro torna alla VM.
 
@@ -350,6 +350,8 @@ PHPStan pulito, come oggi.
 **Comando di prova** `app:connettore-ai:simula [--nome=…|--token=…] --server=http://localhost:8080 --ollama=http://host.docker.internal:11434`: abbina (mostra il codice da approvare) e fa il ciclo del connettore. Provato in sviluppo con l'Ollama nativo del Mac su una pratica ISEE di prova: i documenti diventano lavori, il Mac li analizza, il server ricontrolla e salva le voci con origine `ai_connettore`.
 
 **Fase 2, app.** `lib/features/connettore_ai/`: scheda "AI sul tuo Mac" in Sicurezza e accesso (solo con `connettore_ai:manage`: elenco con stato, chip, modello, tempo medio, documenti analizzati; Rinomina, Scollega con conferma; "Collega un Mac"), rotta `/collega-mac?codice=…` (cerca la richiesta, nome modificabile, codice 2FA se attiva, Approva o Rifiuta), voci "Letta sul Mac" e "Letta sull'iPhone" nella pratica, e nel consenso per i cifrati la spunta "Anche ai dispositivi collegati della famiglia". Provata sul simulatore con il connettore simulato.
+
+**Fase 3, connettore macOS (prima versione).** Cartella `connettore-mac/` ([README](../connettore-mac/README.md)): pacchetto Swift al posto del progetto Xcode (niente identificativo del team nel repository), `scripts/crea-app.sh` per la `.app` (LSUIElement, hardened runtime, firma ad hoc o Developer ID). App nella barra dei menu con finestra di configurazione: server, Ollama, modello (scarica e prova), collegamento con codice grande e QR, avvio al login, pausa con batteria sotto il 20%; ciclo dei lavori con `PUT /me` ogni 60 secondi, proroga ogni 2 minuti, timeout 4 minuti, `beginActivity`, `think: false` per i modelli che ragionano; refresh token nel Portachiavi. Provata sul Mac M3 contro il server di sviluppo: collegamento approvato, documenti analizzati in circa 8 secondi l'uno. Mancano: Sparkle, icona, DMG e notarizzazione (serve Developer ID), test su più Mac.
 
 ## Da decidere
 
