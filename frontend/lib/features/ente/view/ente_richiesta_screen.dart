@@ -1,3 +1,4 @@
+import 'package:cartellaviva/helpers/quanti.dart';
 import 'package:flutter/material.dart';
 import 'package:cartellaviva/widgets/scheda.dart';
 import 'package:cartellaviva/widgets/testo.dart';
@@ -156,7 +157,16 @@ class _EnteRichiestaScreenState extends State<EnteRichiestaScreen> {
               ),
             if (canSend && tot.mancanti > 0)
               FilledButton.icon(
-                onPressed: busy ? null : () => _run(() async => _snack('Sollecitate ${await EnteApi.sollecita(t, id)} famiglie.')),
+                onPressed: busy
+                    ? null
+                    : () async {
+                        // Parte un'email: prima si conferma.
+                        final si = await chiediConferma(context,
+                            titolo: 'Sollecitare chi non ha risposto?',
+                            testo: 'I referenti di ${quanti(tot.mancanti, 'iscritto', 'iscritti')} ricevono un promemoria per email e nell\'app.',
+                            azione: 'Invia il sollecito');
+                        if (si) await _run(() async => _snack('Sollecito inviato a ${quanti(await EnteApi.sollecita(t, id), 'destinatario', 'destinatari')}.'));
+                      },
                 icon: const Icon(LucideIcons.bell_ring, size: 16),
                 label: Text('Sollecita chi manca (${tot.mancanti})'),
               ),

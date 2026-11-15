@@ -109,7 +109,8 @@ class TenantMembersController extends GetxController {
       invitations = canInvite ? await TenantApi.invitations(id) : [];
       final assignable = assignableRoles;
       if (inviteRoleId == null || !assignable.any((r) => r.id == inviteRoleId)) {
-        inviteRoleId = assignable.firstWhereOrNull((r) => r.slug == 'member')?.id ??
+        // Ruolo proposto: membro in una famiglia, operatore in un ente.
+        inviteRoleId = assignable.firstWhereOrNull((r) => r.slug == 'member' || r.slug == 'staff')?.id ??
             assignable.firstWhereOrNull((r) => !r.isOwnerRole)?.id;
       }
     } on ApiException catch (e) {

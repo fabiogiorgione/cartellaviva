@@ -1,3 +1,4 @@
+import 'package:cartellaviva/helpers/quanti.dart';
 import 'package:flutter/material.dart';
 import 'package:cartellaviva/widgets/scheda.dart';
 import 'package:cartellaviva/widgets/testo.dart';
@@ -189,10 +190,10 @@ class _EnteGruppiScreenState extends State<EnteGruppiScreen> {
             items: [for (final a in c.anni) DropdownMenuItem(value: a.id, child: Text(a.archiviato ? '${a.nome} (archiviato)' : '${a.nome} (in corso)'))],
             onChanged: c.scegliAnno,
           ),
-        if (canManage && !archiviato) ...[
-          OutlinedButton(onPressed: _passaggio, child: const Text('Passaggio d\'anno…')),
-          FilledButton.icon(onPressed: () => _gruppo(), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Nuovo gruppo')),
-        ],
+        if (canManage && !archiviato) FilledButton.icon(onPressed: () => _gruppo(), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Nuovo gruppo')),
+      ],
+      secondarie: [
+        if (canManage && !archiviato) (etichetta: 'Passaggio d\'anno…', icona: LucideIcons.calendar_range, azione: _passaggio),
       ],
       child: c.loading
           ? const Center(child: CircularProgressIndicator())
@@ -249,7 +250,7 @@ class _EnteGruppiScreenState extends State<EnteGruppiScreen> {
                   ],
                 ),
             ]),
-            Testo.bodySmall('${g.iscritti} iscritti${g.sede != null ? ' · ${g.sede!.nome}' : ''}', tenue: true),
+            Testo.bodySmall('${quanti(g.iscritti, 'iscritto', 'iscritti')}${g.sede != null ? ' · ${g.sede!.nome}' : ''}', tenue: true),
             SizedBox(height: 6),
             Testo.bodySmall(g.operatori.isEmpty ? 'Nessun operatore assegnato' : 'Operatori: ${g.operatori.map((o) => o.nome).join(', ')}'),
           ])),

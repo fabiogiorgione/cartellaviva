@@ -99,13 +99,13 @@ class _EnteHomeScreenState extends State<EnteHomeScreen> {
               SizedBox(height: 16),
             ],
             Wrap(spacing: 12, runSpacing: 12, children: [
-              numeroCard('Da verificare', '${c.richieste.fold<int>(0, (s, r) => s + r.totali.daVerificare)}'),
+              numeroCard('Da verificare', '${c.richieste.fold<int>(0, (s, r) => s + r.totali.daVerificare)}', onTap: session.can('richiesta_ente:verify') ? () => Get.toNamed('/ente/verifica') : null),
               numeroCard('Documenti in scadenza 30 gg', '${c.inScadenza.length}', nota: c.inScadenza.any((d) => d.rinnovoAutomatico) ? 'rinnovo automatico attivo' : null),
               if (c.iscritti != null) ...[
-                numeroCard('Iscritti', '${c.iscritti!.iscritti}'),
+                numeroCard('Iscritti', '${c.iscritti!.iscritti}', onTap: () => Get.toNamed('/ente/iscritti')),
                 numeroCard('Referenti collegati', c.iscritti!.referenti == 0 ? '-' : '${(c.iscritti!.referentiCollegati * 100 / c.iscritti!.referenti).round()}%',
-                    nota: '${c.iscritti!.referentiCollegati} su ${c.iscritti!.referenti}'),
-                numeroCard('Iscritti senza email', '${c.iscritti!.iscrittiSenzaEmail}'),
+                    nota: '${c.iscritti!.referentiCollegati} su ${c.iscritti!.referenti}', onTap: () => Get.toNamed('/ente/iscritti')),
+                numeroCard('Iscritti senza email', '${c.iscritti!.iscrittiSenzaEmail}', onTap: () => Get.toNamed('/ente/iscritti')),
               ],
             ]),
             SizedBox(height: 16),

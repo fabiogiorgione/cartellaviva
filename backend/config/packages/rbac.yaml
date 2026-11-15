@@ -72,12 +72,13 @@ parameters:
         member:
             name: Membro
             description: Legge tutti i dati del tenant, modifica ed elimina solo quelli che ha caricato.
-            tenant_type: ~
+            # Solo famiglie: in un ente i ruoli sono segreteria e operatore.
+            tenant_type: privato
             permission_groups: [documenti_lettura, documenti_propri, condivisioni_proprie, scadenze_lettura, scadenze_proprie, pagamenti_lettura, pagamenti_propri, pratiche_lettura, pratiche_proprie, membri_lettura, famiglia_gestione, richieste_risposta]
         viewer:
             name: Lettore
             description: Sola lettura (es. un nonno che vede ma non modifica).
-            tenant_type: ~
+            tenant_type: privato
             permission_groups: [documenti_lettura, scadenze_lettura, pagamenti_lettura, pratiche_lettura, membri_lettura, famiglia_lettura, richieste_lettura]
         emergenza:
             name: Contatto d'emergenza

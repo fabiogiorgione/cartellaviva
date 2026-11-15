@@ -36,7 +36,7 @@ class _EnteDatiFormState extends State<EnteDatiForm> {
   }
 
   InputDecoration _deco(String label, {String? hint, String? helper}) =>
-      InputDecoration(labelText: label, hintText: hint, helperText: helper, isDense: true);
+      InputDecoration(labelText: label, hintText: hint, helperText: helper, helperMaxLines: 2, isDense: true);
 
   @override
   Widget build(BuildContext context) {

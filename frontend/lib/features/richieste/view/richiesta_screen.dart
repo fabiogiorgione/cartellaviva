@@ -277,7 +277,8 @@ class _RichiestaScreenState extends State<RichiestaScreen> {
     final passi = switch (r.tipo) {
       'firma' => ['Apri il PDF e stampalo', 'Firma su carta nelle pagine indicate', 'Scansiona tutte le pagine (anche quelle senza firma)'],
       'invio' => ['Scansiona il documento, caricalo da un file o sceglilo dal tuo archivio'],
-      _ => ['Leggi il documento, poi conferma la presa visione'],
+      // Una presa visione può non avere un allegato: allora si legge la richiesta stessa.
+      _ => [r.allegatoNome != null ? 'Leggi il documento, poi conferma la presa visione' : 'Leggi la richiesta, poi conferma la presa visione'],
     };
     return Scheda(paddingAll: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (var i = 0; i < passi.length; i++) Padding(padding: EdgeInsets.only(bottom: 6), child: Testo.bodyMedium('${i + 1}. ${passi[i]}')),

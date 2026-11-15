@@ -1,3 +1,5 @@
+import 'package:cartellaviva/layout/layout.dart';
+import 'package:cartellaviva/helpers/quanti.dart';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -77,6 +79,11 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
         if (r.id != null && r.email != null && const ['da_invitare', 'invitato', 'revocato'].contains(r.stato)) ids.add(r.id!);
       }
     }
+    // Con iscritti selezionati si invitano solo i loro referenti, mai tutto il gruppo.
+    if (selezionati.isNotEmpty && ids.isEmpty) {
+      _snack('Tra gli iscritti selezionati nessun referente è da invitare (già collegati o senza email).');
+      return;
+    }
     if (ids.isEmpty && gruppoId == null) {
       _snack('Seleziona gli iscritti (o filtra un gruppo) con referenti da invitare.');
       return;
@@ -88,7 +95,7 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
       titolo: 'Invitare i referenti a collegarsi?',
       testo: perGruppo
           ? 'Riceveranno l\'invito per email tutti i referenti del gruppo $gruppoNome non ancora collegati.'
-          : 'Riceveranno l\'invito per email ${ids.length} referenti degli iscritti selezionati. Chi l\'aveva già ricevuto riceve un nuovo link.',
+          : 'Riceveranno l\'invito per email i referenti degli iscritti selezionati (${quanti(ids.length, 'iscritto', 'iscritti')}). Chi l\'aveva già ricevuto riceve un nuovo link.',
       azione: 'Invia gli inviti',
     );
     if (!ok) return;
@@ -149,12 +156,12 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
     return PaginaEnte(
       titolo: 'Iscritti',
       sezione: 'Iscritti',
+      secondarie: [
+        (etichetta: 'Guida all\'import', icona: LucideIcons.circle_question_mark, azione: () => Get.toNamed('/aiuto/guida', parameters: {'id': 'ente-import-csv'})),
+        if (canManage) (etichetta: 'Importa CSV', icona: LucideIcons.file_spreadsheet, azione: _importa),
+      ],
       azioni: [
-        const AiutoLink(guida: 'ente-import-csv', etichetta: 'Guida all\'import'),
-        if (canManage) ...[
-          OutlinedButton.icon(onPressed: _importa, icon: const Icon(LucideIcons.file_spreadsheet, size: 18), label: const Text('Importa CSV')),
-          FilledButton.icon(onPressed: () => _apri(), icon: const Icon(LucideIcons.user_plus, size: 18), label: const Text('Nuovo iscritto')),
-        ],
+        if (canManage) FilledButton.icon(onPressed: () => _apri(), icon: const Icon(LucideIcons.user_plus, size: 18), label: const Text('Nuovo iscritto')),
       ],
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Wrap(spacing: 12, runSpacing: 12, children: [
@@ -165,7 +172,8 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
         SizedBox(height: 16),
         Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
           SizedBox(
-            width: 240,
+            // Sul telefono a tutta riga.
+            width: MediaQuery.sizeOf(context).width < larghezzaTelefono ? double.infinity : 240,
             child: TextField(
               decoration: const InputDecoration(prefixIcon: Icon(LucideIcons.search, size: 18), hintText: 'Cerca iscritto', isDense: true),
               onSubmitted: (v) {
@@ -175,7 +183,8 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
             ),
           ),
           DropdownButton<String?>(
-            value: gruppoId,
+            // Aperta da una classe, il filtro arriva prima dei gruppi: finché non ci sono, "Tutti".
+            value: gruppi.any((g) => g.id == gruppoId) ? gruppoId : null,
             hint: const Text('Tutti i gruppi'),
             items: [const DropdownMenuItem<String?>(value: null, child: Text('Tutti i gruppi')), for (final g in gruppi) DropdownMenuItem<String?>(value: g.id, child: Text(g.nome))],
             onChanged: (v) {
@@ -197,7 +206,7 @@ class _EnteIscrittiScreenState extends State<EnteIscrittiScreen> {
               _load();
             },
           ),
-          if (canInvite) OutlinedButton.icon(onPressed: _invita, icon: const Icon(LucideIcons.mail, size: 18), label: Text(selezionati.isEmpty ? 'Invita il gruppo' : 'Invita i selezionati (${selezionati.length})')),
+          if (canInvite && (selezionati.isNotEmpty || gruppoId != null)) OutlinedButton.icon(onPressed: _invita, icon: const Icon(LucideIcons.mail, size: 18), label: Text(selezionati.isEmpty ? 'Invita il gruppo' : 'Invita i selezionati (${selezionati.length})')),
           if (session.can('richiesta_ente:send') && selezionati.isNotEmpty)
             FilledButton.icon(
               onPressed: () => Get.toNamed('/ente/richieste/nuova', arguments: {'iscrittoIds': selezionati.toList()}),

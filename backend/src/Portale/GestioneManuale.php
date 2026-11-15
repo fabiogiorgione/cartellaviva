@@ -439,7 +439,7 @@ final class GestioneManuale
                 throw new DatiNonValidi(sprintf('membri[%d]: %s è già nell\'elenco.', $n, $spec['email']));
             }
             $email[] = $spec['email'];
-            $slug = (string) ($m['ruolo'] ?? Role::MEMBER);
+            $slug = (string) ($m['ruolo'] ?? (TenantType::AZIENDA === $tipo ? Role::STAFF : Role::MEMBER));
             $role = $this->roles->findSystemRole($slug);
             if (!$role instanceof Role || Role::EMERGENZA === $slug || (null !== $role->getTenantType() && $role->getTenantType() !== $tipo)) {
                 throw new DatiNonValidi(sprintf('membri[%d].ruolo: ruolo non valido per questo tipo.', $n));

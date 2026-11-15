@@ -1,3 +1,4 @@
+import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cartellaviva/widgets/modulo_validato.dart';
 import 'package:cartellaviva/helpers/theme/tema_app.dart';
@@ -27,6 +28,9 @@ class TenantMembersScreen extends StatefulWidget {
 class _TenantMembersScreenState extends State<TenantMembersScreen> {
   final TenantMembersController controller = Get.put(TenantMembersController());
 
+  /// Ente (scuola, associazione): stessa pagina, con le parole dell'ente.
+  bool get _ente => SessionService.to.currentMembership?.tenantType == 'azienda';
+
   @override
   Widget build(BuildContext context) {
     return Layout(
@@ -44,10 +48,10 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Testo.titleMedium("Membri e accessi", fontSize: 18, fontWeight: FontWeight.w500),
+                    Testo.titleMedium(_ente ? 'Operatori' : 'Membri e accessi', fontSize: 18, fontWeight: FontWeight.w500),
                     Briciole(voci: [
-                        Briciola(nome: controller.tenantName.isEmpty ? 'Famiglia' : controller.tenantName),
-                        Briciola(nome: 'Membri', attiva: true),
+                        _ente ? Briciola(nome: 'Ente', rotta: '/ente') : Briciola(nome: controller.tenantName.isEmpty ? 'Famiglia' : controller.tenantName),
+                        Briciola(nome: _ente ? 'Operatori' : 'Membri', attiva: true),
                       ],
                     ),
                   ],
@@ -86,7 +90,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Riquadro.cerchio(paddingAll: 10, color: context.colori.primary.withAlpha(30), child: Icon(LucideIcons.house, size: 20, color: context.colori.primary)),
+              Riquadro.cerchio(paddingAll: 10, color: context.colori.primary.withAlpha(30), child: Icon(_ente ? LucideIcons.building : LucideIcons.house, size: 20, color: context.colori.primary)),
               SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +113,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
               ),
             ],
           ),
-          Testo.bodySmall('${controller.members.length} ${controller.members.length == 1 ? 'membro' : 'membri'} · ${controller.activeOwners} ${controller.activeOwners == 1 ? 'proprietario attivo' : 'proprietari attivi'}', tenue: true),
+          Testo.bodySmall('${controller.members.length} ${_ente ? (controller.members.length == 1 ? 'persona' : 'persone') : (controller.members.length == 1 ? 'membro' : 'membri')} · ${controller.activeOwners} ${controller.activeOwners == 1 ? 'proprietario attivo' : 'proprietari attivi'}', tenue: true),
         ],
       ));
   }
@@ -124,7 +128,7 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Testo.bodyMedium("Membri", fontWeight: FontWeight.w500),
+              Testo.bodyMedium(_ente ? "Persone dell'ente" : "Membri", fontWeight: FontWeight.w500),
               IconButton(
                 tooltip: 'Aggiorna',
                 onPressed: controller.load,
@@ -256,11 +260,11 @@ class _TenantMembersScreenState extends State<TenantMembersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Testo.bodyMedium("Invita un familiare", fontWeight: FontWeight.w500),
+            Testo.bodyMedium(_ente ? 'Invita un operatore' : 'Invita un familiare', fontWeight: FontWeight.w500),
             SizedBox(height: 4),
             Testo.bodySmall(enabled
                   ? 'Riceverà un link valido 72 ore per registrarsi o accedere.'
-                  : 'Il tuo ruolo non permette di invitare nuovi membri.', tenue: true),
+                  : 'Il tuo ruolo non permette di invitare ${_ente ? 'nuovi operatori' : 'nuovi membri'}.', tenue: true),
             SizedBox(height: 16),
             TextFormField(
               controller: controller.inviteEmail,

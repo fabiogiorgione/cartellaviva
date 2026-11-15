@@ -54,17 +54,21 @@ class _EnteModelliScreenState extends State<EnteModelliScreen> {
     return PaginaEnte(
       titolo: 'Modelli e regole',
       sezione: 'Modelli',
-      azioni: [const AiutoLink(guida: 'ente-modelli'), if (canSend) FilledButton.icon(onPressed: () => _modifica(), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Nuovo modello'))],
+      secondarie: [(etichetta: 'Come funziona?', icona: LucideIcons.circle_question_mark, azione: () => Get.toNamed('/aiuto/guida', parameters: {'id': 'ente-modelli'}))],
+      azioni: [if (canSend) FilledButton.icon(onPressed: () => _modifica(), icon: const Icon(LucideIcons.plus, size: 18), label: const Text('Nuovo modello'))],
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Testo.bodySmall('Un modello si riusa per le richieste di ogni anno. Può chiedere la data di validità (es. certificato medico) e ripartire da solo al solo interessato prima della scadenza, '
-          'partire ogni anno in una data verso tutto l\'ente, ed eliminare le copie ricevute dopo un certo numero di mesi.', tenue: true),
-        SizedBox(height: 16),
         FutureBuilder<List<ModelloRichiesta>>(
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
             if (snap.hasError) return erroreCard(snap.error.toString(), _reload);
             final modelli = snap.data!;
+            // Con l'elenco vuoto la spiegazione la dà già la scheda "Nessun modello".
+            const intro = Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Testo.bodySmall('Un modello si riusa per le richieste di ogni anno. Può chiedere la data di validità (es. certificato medico) e ripartire da solo al solo interessato prima della scadenza, '
+                  'partire ogni anno in una data verso tutto l\'ente, ed eliminare le copie ricevute dopo un certo numero di mesi.', tenue: true),
+            );
             if (modelli.isEmpty) {
               return StatoVuoto(
                 icona: LucideIcons.layout_template,
@@ -75,7 +79,9 @@ class _EnteModelliScreenState extends State<EnteModelliScreen> {
                 guida: 'ente-modelli',
               );
             }
-            return Scheda(paddingAll: 0, child: Column(children: [
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              intro,
+              Scheda(paddingAll: 0, child: Column(children: [
                 for (final m in modelli)
                   ListTile(
                     leading: Icon(m.tipo == 'firma' ? LucideIcons.pen_line : (m.tipo == 'invio' ? LucideIcons.upload : LucideIcons.eye)),
@@ -93,7 +99,8 @@ class _EnteModelliScreenState extends State<EnteModelliScreen> {
                           ])
                         : null,
                   ),
-              ]));
+              ])),
+            ]);
           },
         ),
       ]),

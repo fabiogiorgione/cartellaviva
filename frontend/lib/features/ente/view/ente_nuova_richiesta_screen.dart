@@ -1,3 +1,4 @@
+import 'package:cartellaviva/helpers/quanti.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -160,12 +161,12 @@ class _EnteNuovaRichiestaScreenState extends State<EnteNuovaRichiestaScreen> {
               SizedBox(height: 8),
               Testo.labelMedium('Destinatari *'),
               if (iscrittoIds != null && gruppoId == null)
-                Testo.bodyMedium('${iscrittoIds!.length} iscritti selezionati')
+                Testo.bodyMedium(quanti(iscrittoIds!.length, 'iscritto selezionato', 'iscritti selezionati'))
               else
                 DropdownButtonFormField<String>(
                   initialValue: gruppoId,
                   decoration: const InputDecoration(isDense: true, hintText: 'Scegli il gruppo'),
-                  items: [for (final g in gruppi) DropdownMenuItem(value: g.id, child: Text('${g.nome} (${g.iscritti} iscritti)'))],
+                  items: [for (final g in gruppi) DropdownMenuItem(value: g.id, child: Text('${g.nome} (${quanti(g.iscritti, 'iscritto', 'iscritti')})'))],
                   onChanged: (v) {
                     setState(() => gruppoId = v);
                     _anteprima();
@@ -229,7 +230,7 @@ class _EnteNuovaRichiestaScreenState extends State<EnteNuovaRichiestaScreen> {
               FilledButton.icon(
                 onPressed: busy || !pronto ? null : _invia,
                 icon: const Icon(LucideIcons.send, size: 18),
-                label: Text(anteprima == null ? 'Invia' : 'Invia a ${anteprima!.iscritti - anteprima!.nonRaggiunti.length} iscritti'),
+                label: Text(anteprima == null ? 'Invia' : 'Invia a ${quanti(anteprima!.iscritti - anteprima!.nonRaggiunti.length, 'iscritto', 'iscritti')}'),
               ),
             ])),
         ),
@@ -239,12 +240,12 @@ class _EnteNuovaRichiestaScreenState extends State<EnteNuovaRichiestaScreen> {
             child: Scheda(paddingAll: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Testo.titleSmall('Anteprima dell\'invio', fontWeight: FontWeight.w600),
                 SizedBox(height: 12),
-                Testo.bodyMedium('${anteprima!.iscritti} iscritti · ${anteprima!.referenti} referenti'),
-                Testo.bodyMedium('${anteprima!.referentiCollegati} referenti nell\'app (${anteprima!.famiglie} famiglie)'),
+                Testo.bodyMedium('${quanti(anteprima!.iscritti, 'iscritto', 'iscritti')} · ${quanti(anteprima!.referenti, 'referente', 'referenti')}'),
+                Testo.bodyMedium('${quanti(anteprima!.referentiCollegati, 'referente', 'referenti')} nell\'app (${quanti(anteprima!.famiglie, 'famiglia', 'famiglie')})'),
                 Testo.bodyMedium('${anteprima!.viaLink} via link sicuro (senza account: rispondono dal browser con un codice via email)'),
                 if (anteprima!.nonRaggiunti.isNotEmpty) ...[
                   SizedBox(height: 12),
-                  Testo.bodySmall('${anteprima!.nonRaggiunti.length} iscritti senza referenti raggiungibili (né collegati né con un\'email) non riceveranno la richiesta: ${anteprima!.nonRaggiunti.join(', ')}.', color: ColoreStato.avviso),
+                  Testo.bodySmall('${quanti(anteprima!.nonRaggiunti.length, 'iscritto', 'iscritti')} senza referenti raggiungibili (né collegati né con un\'email) non riceveranno la richiesta: ${anteprima!.nonRaggiunti.join(', ')}.', color: ColoreStato.avviso),
                   Testo.bodySmall('Invitali dalla pagina Iscritti.', tenue: true),
                 ],
               ])),

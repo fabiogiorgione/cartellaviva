@@ -201,10 +201,9 @@ class _VerificaAffiancataScreenState extends State<VerificaAffiancataScreen> {
   @override
   Widget build(BuildContext context) {
     return PaginaEnte(
-      indietro: '/ente/richieste',
       titolo: 'Verifica delle risposte',
       sezione: 'Verifica',
-      azioni: const [AiutoLink(guida: 'ente-richiesta')],
+      secondarie: [(etichetta: 'Come funziona?', icona: LucideIcons.circle_question_mark, azione: () => Get.toNamed('/aiuto/guida', parameters: {'id': 'ente-richiesta'}))],
       child: Focus(focusNode: focus, autofocus: true, onKeyEvent: _tasto, child: _corpo()),
     );
   }

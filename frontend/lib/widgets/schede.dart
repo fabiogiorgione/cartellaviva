@@ -13,16 +13,28 @@ Widget erroreCard(String messaggio, VoidCallback riprova) => Scheda(paddingAll: 
       ]));
 
 /// Numero grande con etichetta (cruscotti).
-Widget numeroCard(String etichetta, String valore, {String? nota}) => Builder(builder: (context) {
-      // Sul telefono due per riga (larghe 210 ne entrava una sola, a metà schermo).
+Widget numeroCard(String etichetta, String valore, {String? nota, VoidCallback? onTap}) => Builder(builder: (context) {
       final schermo = MediaQuery.sizeOf(context).width;
+      if (schermo >= 769) {
+        return SizedBox(
+          width: 210,
+          child: Scheda(paddingAll: 16, onTap: onTap, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Testo.labelSmall(etichetta.toUpperCase(), tenue: true, fontWeight: FontWeight.w600),
+              SizedBox(height: 6),
+              Testo.titleLarge(valore, fontWeight: FontWeight.w600),
+              if (nota != null) Testo.bodySmall(nota, tenue: true),
+            ])),
+        );
+      }
+      // Sul telefono tre per riga e compatte: prima i numeri occupavano metà
+      // schermo e il contenuto della pagina (elenchi, richieste) finiva sotto.
       return SizedBox(
-      width: schermo < 769 ? ((schermo - 56) / 2).clamp(130.0, 210.0) : 210,
-      child: Scheda(paddingAll: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Testo.labelSmall(etichetta.toUpperCase(), tenue: true, fontWeight: FontWeight.w600),
-          SizedBox(height: 6),
-          Testo.titleLarge(valore, fontWeight: FontWeight.w600),
-          if (nota != null) Testo.bodySmall(nota, tenue: true),
-        ])),
-    );
+        width: ((schermo - 68) / 3).clamp(96.0, 160.0),
+        child: Scheda(paddingAll: 10, onTap: onTap, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Testo.labelSmall(etichetta, tenue: true, fontSize: 11, maxLines: 2, overflow: TextOverflow.ellipsis),
+            SizedBox(height: 4),
+            Testo.titleMedium(valore, fontWeight: FontWeight.w600),
+            if (nota != null) Testo.bodySmall(nota, tenue: true, fontSize: 11, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ])),
+      );
     });

@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+import 'package:cartellaviva/layout/layout.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:cartellaviva/widgets/scheda.dart';
@@ -18,8 +20,9 @@ class VoceRegistro {
   final String azione;
   final String esito;
   final Map<String, dynamic> contesto;
+  final String? risorsaTipo, risorsaId;
 
-  VoceRegistro({required this.id, required this.quando, this.chi, required this.azione, required this.esito, this.contesto = const {}});
+  VoceRegistro({required this.id, required this.quando, this.chi, required this.azione, required this.esito, this.contesto = const {}, this.risorsaTipo, this.risorsaId});
 
   factory VoceRegistro.fromJson(Map<String, dynamic> j) => VoceRegistro(
         id: '${j['id']}',
@@ -28,7 +31,12 @@ class VoceRegistro {
         azione: j['action'] as String,
         esito: (j['outcome'] as String?) ?? 'success',
         contesto: Map<String, dynamic>.from((j['context'] as Map?) ?? const {}),
+        risorsaTipo: j['resourceType'] as String?,
+        risorsaId: j['resourceId'] as String?,
       );
+
+  /// Le righe di una richiesta portano al suo dettaglio.
+  String? get rotta => risorsaTipo == 'ente_richiesta' && risorsaId != null ? '/ente/richieste/$risorsaId' : null;
 
   String get descrizione => descrizioneAzione(azione);
 
@@ -50,7 +58,7 @@ const Map<String, String> azioniRegistro = {
   'richiesta.firmata_con_codice': 'Un referente ha firmato con codice',
   'richiesta.accettata': 'Ha accettato una risposta',
   'richiesta.da_rifirmare': 'Ha chiesto a una famiglia di correggere una risposta',
-  'richiesta.sollecitata': 'Ha sollecitato le famiglie',
+  'richiesta.sollecitata': 'Ha sollecitato chi non aveva risposto',
   'richiesta.annullata': 'Ha annullato una richiesta',
   'richiesta.allegato_scaricato': 'Ha scaricato il PDF della richiesta',
   'richiesta.risposta_scaricata': 'Ha aperto una risposta consegnata',
@@ -168,7 +176,7 @@ class _RegistroEnteScreenState extends State<RegistroEnteScreen> {
               _carica(reset: true);
             }),
           SizedBox(
-            width: 240,
+            width: MediaQuery.sizeOf(context).width < larghezzaTelefono ? double.infinity : 240,
             child: TextField(
               controller: attore,
               onSubmitted: (_) => _carica(reset: true),
@@ -187,6 +195,8 @@ class _RegistroEnteScreenState extends State<RegistroEnteScreen> {
                   leading: Icon(v.negata ? LucideIcons.shield_x : LucideIcons.scroll_text, color: v.negata ? ColoreStato.errore : null, size: 20),
                   title: Text(v.descrizione + (v.negata ? ' (non consentito)' : '')),
                   subtitle: Text([_ora(v.quando), v.chi ?? 'sistema'].join(' · ')),
+                  trailing: v.rotta == null ? null : const Icon(LucideIcons.chevron_right, size: 16),
+                  onTap: v.rotta == null ? null : () => Get.toNamed(v.rotta!),
                 ),
             ])),
         SizedBox(height: 12),

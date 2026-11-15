@@ -65,45 +65,89 @@ class _IscrittoDialogState extends State<_IscrittoDialog> {
 
   Future<void> _referente([Referente? r]) async {
     final edit = Referente(id: r?.id, nome: r?.nome ?? '', cognome: r?.cognome ?? '', email: r?.email, relazione: r?.relazione, stato: r?.stato ?? 'da_invitare');
+    final form = GlobalKey<FormState>();
+    String? erroreReferente;
+    var salvataggio = false;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(r == null ? 'Nuovo referente' : 'Modifica referente'),
-        content: SizedBox(
-          width: 400,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextFormField(initialValue: edit.nome, decoration: const InputDecoration(labelText: 'Nome', isDense: true), onChanged: (v) => edit.nome = v),
-            SizedBox(height: 10),
-            TextFormField(initialValue: edit.cognome, decoration: const InputDecoration(labelText: 'Cognome', isDense: true), onChanged: (v) => edit.cognome = v),
-            SizedBox(height: 10),
-            TextFormField(initialValue: edit.email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email', isDense: true), onChanged: (v) => edit.email = v),
-            SizedBox(height: 10),
-            TextFormField(initialValue: edit.relazione, decoration: const InputDecoration(labelText: 'Relazione (madre, padre, tutore…)', isDense: true), onChanged: (v) => edit.relazione = v),
-            if (r?.stato == 'collegato') ...[
-              SizedBox(height: 8),
-              Testo.bodySmall('Cambiando l\'email di un referente già collegato il collegamento resta; un invito in corso invece si annulla.', tenue: true),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, aggiorna) {
+          // Il modulo resta aperto finché i dati non vanno bene: niente da riscrivere.
+          Future<void> conferma() async {
+            if (!(form.currentState?.validate() ?? false)) return;
+            if (nuovo) {
+              Navigator.pop(ctx, true);
+              return;
+            }
+            aggiorna(() {
+              salvataggio = true;
+              erroreReferente = null;
+            });
+            try {
+              await EnteApi.salvaReferente(widget.tenantId, iscrittoId: widget.iscritto!.id, referente: edit);
+              changed = true;
+              if (ctx.mounted) Navigator.pop(ctx, true);
+            } on ApiException catch (e) {
+              aggiorna(() {
+                salvataggio = false;
+                erroreReferente = e.fieldErrors.isNotEmpty ? e.fieldErrors.values.first : e.message;
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(r == null ? 'Nuovo referente' : 'Modifica referente'),
+            content: SizedBox(
+              width: 400,
+              child: Form(
+                key: form,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextFormField(
+                    initialValue: edit.nome,
+                    decoration: const InputDecoration(labelText: 'Nome', isDense: true),
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (v) => edit.nome = v,
+                    validator: (v) => (v ?? '').trim().isEmpty ? 'Scrivi il nome.' : null,
+                  ),
+                  SizedBox(height: 10),
+                  TextFormField(
+                    initialValue: edit.cognome,
+                    decoration: const InputDecoration(labelText: 'Cognome', isDense: true),
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (v) => edit.cognome = v,
+                    validator: (v) => (v ?? '').trim().isEmpty ? 'Scrivi il cognome.' : null,
+                  ),
+                  SizedBox(height: 10),
+                  TextFormField(
+                    initialValue: edit.email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'Email (per l\'invito)', isDense: true),
+                    onChanged: (v) => edit.email = v.trim().isEmpty ? null : v.trim(),
+                    validator: (v) => (v ?? '').trim().isEmpty || RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v!.trim()) ? null : 'Email non valida.',
+                  ),
+                  SizedBox(height: 10),
+                  TextFormField(initialValue: edit.relazione, decoration: const InputDecoration(labelText: 'Relazione (madre, padre, tutore…)', isDense: true), onChanged: (v) => edit.relazione = v),
+                  if (r?.stato == 'collegato') ...[
+                    SizedBox(height: 8),
+                    Testo.bodySmall('Cambiando l\'email di un referente già collegato il collegamento resta; un invito in corso invece si annulla.', tenue: true),
+                  ],
+                  if (erroreReferente != null) ...[SizedBox(height: 8), Testo.bodySmall(erroreReferente!, color: ColoreStato.errore)],
+                ]),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: salvataggio ? null : () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+              FilledButton(onPressed: salvataggio ? null : conferma, child: const Text('OK')),
             ],
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('OK')),
-        ],
+          );
+        },
       ),
     );
     if (ok != true) return;
-    if (nuovo) {
-      // Iscritto non ancora salvato: i referenti partono con lui.
-      setState(() => r == null ? referenti.add(edit) : referenti[referenti.indexOf(r)] = edit);
-      return;
-    }
-    try {
-      await EnteApi.salvaReferente(widget.tenantId, iscrittoId: widget.iscritto!.id, referente: edit);
-      changed = true;
-      setState(() => r == null ? referenti.add(edit) : referenti[referenti.indexOf(r)] = edit);
-    } on ApiException catch (e) {
-      setState(() => errore = e.message);
-    }
+    setState(() {
+      errore = null;
+      r == null ? referenti.add(edit) : referenti[referenti.indexOf(r)] = edit;
+    });
   }
 
   Future<void> _togliReferente(Referente r) async {
@@ -171,7 +215,7 @@ class _IscrittoDialogState extends State<_IscrittoDialog> {
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: Text('${r.nomeCompleto}${r.relazione != null ? ' · ${r.relazione}' : ''}'),
-                subtitle: Text('${r.email ?? 'senza email'} · ${r.statoLabel}'),
+                subtitle: Text(r.email == null || r.email!.isEmpty ? 'Manca l\'email: aggiungila per invitarlo' : '${r.email} · ${r.statoLabel}'),
                 trailing: ro
                     ? null
                     : Row(mainAxisSize: MainAxisSize.min, children: [

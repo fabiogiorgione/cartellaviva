@@ -31,8 +31,10 @@ class _EnteRichiesteScreenState extends State<EnteRichiesteScreen> {
     return PaginaEnte(
       titolo: 'Richieste',
       sezione: 'Richieste',
+      secondarie: [
+        (etichetta: 'Come funziona?', icona: LucideIcons.circle_question_mark, azione: () => Get.toNamed('/aiuto/guida', parameters: {'id': 'ente-richiesta'})),
+      ],
       azioni: [
-        const AiutoLink(guida: 'ente-richiesta'),
         if (SessionService.to.can('richiesta_ente:send'))
           FilledButton.icon(
             onPressed: () async {
