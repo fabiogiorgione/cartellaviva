@@ -255,11 +255,36 @@ class _PraticaScreenState extends State<PraticaScreen> {
       'Leggiamo anche i documenti cifrati che possono servire (es. Salute, Documenti identità). Il testo si decifra in memoria sul server, va solo all\'AI locale e non si conserva; teniamo solo i valori (importo, data…), cifrati.';
 
   Future<void> _chiediConsenso(Pratica p) async {
-    final si = await chiediConferma(context,
-        titolo: 'Analizzare i documenti cifrati?',
-        testo: '${p.sulTelefono ? _consensoTelefono : _consensoServer}\n\nIl consenso vale solo per questa pratica e lo puoi revocare.',
-        azione: 'Acconsento');
-    if (si) await _fai((t) => PraticheApi.consensoCifrati(t, p.id, true), fatto: 'Analisi dei documenti cifrati avviata.');
+    var dispositivi = false;
+    final si = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setState) => AlertDialog(
+              title: const Text('Analizzare i documenti cifrati?'),
+              content: SizedBox(
+                width: 460,
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${p.sulTelefono ? _consensoTelefono : _consensoServer}\n\nIl consenso vale solo per questa pratica e lo puoi revocare.'),
+                  if (!p.sulTelefono)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: dispositivi,
+                      onChanged: (v) => setState(() => dispositivi = v ?? false),
+                      title: const Text('Anche ai dispositivi collegati della famiglia, come il Mac'),
+                      subtitle: const Text('Il testo va al Mac collegato in Sicurezza e accesso, che lo legge con il suo modello e non lo conserva.'),
+                    ),
+                ]),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Acconsento')),
+              ],
+            ),
+          ),
+        ) ??
+        false;
+    if (si) await _fai((t) => PraticheApi.consensoCifrati(t, p.id, true, dispositivi: p.sulTelefono ? null : dispositivi), fatto: 'Analisi dei documenti cifrati avviata.');
   }
 
   Widget _numeri(Pratica p) => Wrap(spacing: 12, runSpacing: 12, children: [
@@ -423,6 +448,8 @@ class _PraticaScreenState extends State<PraticaScreen> {
               Testo.bodyMedium(_dettagli(r, v).isEmpty ? (v.documento?.titolo ?? r.etichetta) : _dettagli(r, v), fontWeight: FontWeight.w500),
               if (v.documento != null) LinkDocumento(documentoId: v.documento!.id, titolo: v.documento!.titolo),
               if (v.origine == 'manuale') const Testo.bodySmall('Aggiunta a mano', tenue: true),
+              if (v.origine == 'ai_connettore') const Testo.bodySmall('Letta sul Mac', tenue: true),
+              if (v.origine == 'ai_telefono') const Testo.bodySmall('Letta sull\'iPhone', tenue: true),
               if (!v.esclusa) _controlli(v),
             ]),
           ),

@@ -9,9 +9,15 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:get/get.dart';
 import 'package:cartellaviva/features/account/controller/account_security_controller.dart';
 import 'package:cartellaviva/helpers/services/ai_locale.dart';
+import 'package:cartellaviva/helpers/services/sblocco_biometrico.dart';
 import 'package:cartellaviva/helpers/services/google_auth_service.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/features/account/view/credenziali_dialogs.dart';
+import 'package:cartellaviva/features/connettore_ai/collega_mac_screen.dart' show permessoConnettoreAi;
+import 'package:cartellaviva/features/connettore_ai/connettori_api.dart';
+import 'package:cartellaviva/helpers/services/api/api_exception.dart';
+import 'package:cartellaviva/widgets/conferma.dart';
+import 'package:cartellaviva/widgets/messaggio.dart';
 import 'package:cartellaviva/layout/layout.dart';
 import 'package:cartellaviva/widgets/google_sign_in_button.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -62,7 +68,9 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                         CellaGriglia(colonne: 7, child: twoFactorCard()),
                         CellaGriglia(colonne: 5, child: googleCard()),
                         CellaGriglia(colonne: 7, child: credenzialiCard()),
+                        if (SbloccoBiometrico.supportato) CellaGriglia(colonne: 5, child: sbloccoCard()),
                         if (AiLocale.supportata) CellaGriglia(colonne: 5, child: aiLocaleCard()),
+                        if (SessionService.to.can(permessoConnettoreAi) && SessionService.to.currentTenantId != null) CellaGriglia(colonne: 7, child: macCard()),
                       ]),
               ),
             ],
@@ -256,6 +264,48 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
     );
   }
 
+  // ---- Sblocco con Face ID ---------------------------------------------------------
+
+  late final Future<({bool disponibile, String nome})> _biometria = _statoBiometria();
+
+  static Future<({bool disponibile, String nome})> _statoBiometria() async => (disponibile: await SbloccoBiometrico.disponibile(), nome: await SbloccoBiometrico.nome());
+
+  /// Spunta per dispositivo: all'apertura (e dopo 5 minuti in background) l'app chiede il volto.
+  Widget sbloccoCard() {
+    return card(
+      icon: LucideIcons.scan_face,
+      title: 'Sblocco con Face ID',
+      subtitle: 'Su questo telefono CartellaViva resta collegata, ma si apre solo con il tuo volto (o la password): all\'avvio e quando torni dopo 5 minuti.',
+      children: [
+        FutureBuilder<({bool disponibile, String nome})>(
+          future: _biometria,
+          builder: (context, snap) {
+            if (!snap.hasData) return const LinearProgressIndicator();
+            final b = snap.data!;
+            return ValueListenableBuilder<bool>(
+              valueListenable: SbloccoBiometrico.attivo,
+              builder: (context, attivo, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: attivo,
+                  onChanged: b.disponibile || attivo
+                      ? (v) async {
+                          final ok = await SbloccoBiometrico.imposta(v ?? false);
+                          if (!ok && context.mounted) mostraMessaggio(context, '${b.nome} non riuscito: lo sblocco non è stato attivato.', errore: true);
+                        }
+                      : null,
+                  title: Testo.bodyMedium('Apri CartellaViva con ${b.nome}'),
+                ),
+                if (!b.disponibile) Testo.bodySmall('Su questo telefono non c\'è un volto o un\'impronta registrati: si attivano nelle Impostazioni di sistema.', tenue: true),
+              ]),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   // ---- Analisi sul telefono (modello Apple) ----------------------------------------
 
   late final Future<StatoAiLocale> _statoAi = AiLocale.carica().then((_) => AiLocale.stato());
@@ -294,6 +344,109 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         ),
       ],
     );
+  }
+
+  // ---- AI sul Mac (connettore) ---------------------------------------------------------
+
+  late Future<List<ConnettoreAi>> _mac = _caricaMac();
+
+  Future<List<ConnettoreAi>> _caricaMac() => ConnettoriApi.elenco(SessionService.to.currentTenantId!);
+
+  /// I Mac della famiglia che fanno le analisi AI al posto del server (docs/connettore-ai.md).
+  Widget macCard() {
+    return card(
+      icon: LucideIcons.laptop,
+      title: 'AI sul tuo Mac',
+      subtitle: 'Un Mac della famiglia può fare le analisi dei documenti al posto del server: molto più veloce, e il testo non va all\'AI del server. '
+          'Il Mac restituisce solo i valori letti, che il server ricontrolla. Se è spento, le analisi tornano al server.',
+      children: [
+        FutureBuilder<List<ConnettoreAi>>(
+          future: _mac,
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator();
+            if (snap.hasError) return Testo.bodySmall(snap.error is ApiException ? (snap.error as ApiException).message : 'Non riesco a caricare i Mac collegati.');
+            final mac = snap.data!;
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (mac.isEmpty) const Testo.bodySmall('Nessun Mac collegato.', tenue: true),
+              for (final m in mac)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Flexible(child: Testo.bodyMedium(m.nome, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 8),
+                          badge(m.online ? 'Online' : 'Non in linea', m.online ? context.colori.success : context.colori.warning),
+                        ]),
+                        if (m.descrizione.isNotEmpty) Testo.bodySmall(m.descrizione, tenue: true),
+                        Testo.bodySmall('${m.lavoriFatti} ${m.lavoriFatti == 1 ? 'documento analizzato' : 'documenti analizzati'}${!m.online && m.ultimoContatto != null ? ' · ultimo contatto ${_quando(m.ultimoContatto!)}' : ''}', tenue: true),
+                      ]),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Azioni',
+                      icon: const Icon(LucideIcons.ellipsis_vertical, size: 18),
+                      onSelected: (a) => a == 'rinomina' ? _rinominaMac(m) : _scollegaMac(m),
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'rinomina', child: Text('Rinomina')),
+                        PopupMenuItem(value: 'scollega', child: Text('Scollega', style: TextStyle(color: context.colori.danger))),
+                      ],
+                    ),
+                  ]),
+                ),
+              const SizedBox(height: 4),
+              OutlinedButton.icon(onPressed: () => Get.toNamed('/collega-mac'), icon: const Icon(LucideIcons.plus, size: 16), label: const Text('Collega un Mac')),
+              const SizedBox(height: 6),
+              const Testo.bodySmall('Sul Mac serve l\'app CartellaViva per Mac con Ollama: mostra un codice, che approvi qui.', tenue: true),
+            ]);
+          },
+        ),
+      ],
+    );
+  }
+
+  String _quando(DateTime d) {
+    final diff = DateTime.now().difference(d);
+    if (diff.inMinutes < 60) return '${diff.inMinutes.clamp(1, 59)} min fa';
+    if (diff.inHours < 24) return '${diff.inHours} ore fa';
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _rinominaMac(ConnettoreAi m) async {
+    final campo = TextEditingController(text: m.nome);
+    final nome = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rinomina il Mac'),
+        content: SizedBox(width: 400, child: TextField(controller: campo, autofocus: true, maxLength: 80, decoration: const InputDecoration(labelText: 'Nome'))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, campo.text.trim()), child: const Text('Salva')),
+        ],
+      ),
+    );
+    campo.dispose();
+    if (nome == null || nome.isEmpty || nome == m.nome) return;
+    await _azioneMac(() => ConnettoriApi.rinomina(SessionService.to.currentTenantId!, m.id, nome), 'Nome aggiornato.');
+  }
+
+  Future<void> _scollegaMac(ConnettoreAi m) async {
+    final si = await chiediConferma(context,
+        titolo: 'Scollegare "${m.nome}"?',
+        testo: 'Il Mac smette subito di ricevere documenti; le analisi in corso tornano al server. Per ricollegarlo servirà un nuovo codice.',
+        azione: 'Scollega',
+        distruttiva: true);
+    if (si) await _azioneMac(() => ConnettoriApi.scollega(SessionService.to.currentTenantId!, m.id), 'Mac scollegato.');
+  }
+
+  Future<void> _azioneMac(Future<void> Function() azione, String fatto) async {
+    try {
+      await azione();
+      if (mounted) mostraMessaggio(context, fatto);
+    } on ApiException catch (e) {
+      if (mounted) mostraMessaggio(context, e.message, errore: true);
+    }
+    if (mounted) setState(() => _mac = _caricaMac());
   }
 
   // ---- Helper ---------------------------------------------------------------------

@@ -13,6 +13,14 @@ security:
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
 
+        # Connettore AI sul Mac (docs/connettore-ai.md): solo il suo token, solo queste rotte.
+        # Il token del connettore non vale sul firewall "api", e un JWT utente non vale qui.
+        ai_connector:
+            pattern: ^/api/ai-connector-plugin
+            stateless: true
+            access_token:
+                token_handler: App\ConnettoreAi\Security\TokenConnettoreHandler
+
         # Tutta l'API è stateless: identità dal JWT, permessi dal DB a ogni richiesta.
         api:
             pattern: ^/api
@@ -43,6 +51,9 @@ security:
             provider: app_user_provider
 
     access_control:
+        # Abbinamento del connettore AI (RFC 8628): credenziali nel corpo; il resto vuole il suo token.
+        - { path: ^/api/ai-connector-plugin/oauth/(device|token)$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/ai-connector-plugin, roles: ROLE_CONNETTORE_AI }
         - { path: ^/api/auth/(login|refresh|register|registrazione|google|2fa)$, roles: PUBLIC_ACCESS }
         - { path: ^/api/invitations/(preview|accept)$, roles: PUBLIC_ACCESS }
         # Ritorno da Google: nessun JWT, vale solo con lo state monouso (ImportSourceService).

@@ -3,6 +3,7 @@ import 'package:cartellaviva/helpers/services/ai_locale.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:cartellaviva/helpers/services/deep_link_service.dart';
+import 'package:cartellaviva/helpers/services/sblocco_biometrico.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 import 'package:cartellaviva/helpers/services/storage/local_storage.dart';
 import 'package:cartellaviva/helpers/theme/preferenze_tema.dart';
@@ -22,6 +23,8 @@ Future<void> main() async {
   await AiLocale.carica();
   // Ripristina la sessione (token in storage sicuro + GET /api/me).
   await SessionService.init();
+  // Con lo sblocco attivo l'app parte bloccata (AuthMiddleware manda a /auth/sblocco).
+  await SbloccoBiometrico.avvia();
   runApp(const CartellaVivaApp());
   // Dopo runApp: i link aprono rotte di GetX.
   await DeepLinkService.init();

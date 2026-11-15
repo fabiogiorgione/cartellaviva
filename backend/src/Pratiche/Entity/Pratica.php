@@ -72,6 +72,10 @@ class Pratica implements OwnedResourceInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $consensoCifratiIl = null;
 
+    /** Consenso a far leggere i cifrati anche ai dispositivi collegati della famiglia (connettore sul Mac). */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $consensoCifratiDispositiviIl = null;
+
     public const ANALISI_SERVER = 'server';
     public const ANALISI_TELEFONO = 'telefono';
 
@@ -183,8 +187,24 @@ class Pratica implements OwnedResourceInterface
         $this->consensoCifratiIl = new \DateTimeImmutable();
     }
 
+    public function haConsensoCifratiDispositivi(): bool
+    {
+        return $this->haConsensoCifrati() && null !== $this->consensoCifratiDispositiviIl;
+    }
+
+    public function getConsensoCifratiDispositiviIl(): ?\DateTimeImmutable
+    {
+        return $this->consensoCifratiDispositiviIl;
+    }
+
+    public function consensoCifratiDispositivi(bool $si): void
+    {
+        $this->consensoCifratiDispositiviIl = $si ? ($this->consensoCifratiDispositiviIl ?? new \DateTimeImmutable()) : null;
+    }
+
     public function revocaConsensoCifrati(): void
     {
+        $this->consensoCifratiDispositiviIl = null;
         $this->consensoCifratiDa = null;
         $this->consensoCifratiIl = null;
     }

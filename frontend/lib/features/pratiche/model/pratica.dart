@@ -254,7 +254,7 @@ class Pratica {
   final String totaleConfermato;
   final List<PersonaPratica> persone;
   final ModelloPratica? info;
-  final ({String? da, DateTime? il})? consensoCifrati;
+  final ({String? da, DateTime? il, bool dispositivi})? consensoCifrati;
   final List<({String requisito, String? personaId, String? dettaglio})> nonServe;
   final ({String id, DateTime data})? scadenzaRinnovo;
 
@@ -315,7 +315,7 @@ class Pratica {
       totaleConfermato: j['totaleConfermato'] as String? ?? '0.00',
       persone: _lista(j['persone']).map((p) => PersonaPratica(p['id'] as String, p['nome'] as String)).toList(),
       info: j['modelloInfo'] is Map ? ModelloPratica.fromJson(Map<String, dynamic>.from(j['modelloInfo'] as Map)) : null,
-      consensoCifrati: c == null ? null : (da: _s<String>(c['da']), il: DateTime.tryParse(c['il'] as String? ?? '')),
+      consensoCifrati: c == null ? null : (da: _s<String>(c['da']), il: DateTime.tryParse(c['il'] as String? ?? ''), dispositivi: c['dispositivi'] == true),
       nonServe: _lista(j['nonServe']).map((n) => (requisito: n['requisito'] as String, personaId: _s<String>(n['personaId']), dettaglio: _s<String>(n['dettaglio']))).toList(),
       scadenzaRinnovo: r == null ? null : (id: r['id'] as String, data: DateTime.parse(r['data'] as String)),
       analisiSu: j['analisiSu'] as String? ?? 'server',

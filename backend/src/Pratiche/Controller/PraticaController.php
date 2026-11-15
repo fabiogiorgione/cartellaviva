@@ -2,6 +2,7 @@
 
 namespace App\Pratiche\Controller;
 
+use App\ConnettoreAi\LavoriAi;
 use App\Documenti\DocumentService;
 use App\Documenti\Repository\CategoriaRepository;
 use App\Pratiche\CandidatiPratica;
@@ -50,6 +51,7 @@ final class PraticaController extends AbstractController
         private readonly PraticaCifratura $cifratura,
         private readonly DocumentService $documents,
         private readonly CategoriaRepository $categorie,
+        private readonly LavoriAi $lavoriAi,
     ) {
     }
 
@@ -117,7 +119,13 @@ final class PraticaController extends AbstractController
     public function consenso(Request $request, string $tenantId, string $id): JsonResponse
     {
         $pratica = $this->gestibile($tenantId, $id);
-        $this->azioni->consensoCifrati($pratica, $this->access->currentUser(), false !== ($this->body($request)['consenso'] ?? true));
+        $body = $this->body($request);
+        $dispositivi = \array_key_exists('dispositivi', $body) ? true === $body['dispositivi'] : null;
+        $this->azioni->consensoCifrati($pratica, $this->access->currentUser(), false !== ($body['consenso'] ?? true), $dispositivi);
+        if (!$pratica->haConsensoCifratiDispositivi()) {
+            // Senza consenso per i dispositivi, i cifrati in coda per il Mac tornano al server.
+            $this->lavoriAi->rimandaCifrati($pratica);
+        }
 
         return $this->json($this->dettaglioDi($pratica));
     }
@@ -387,7 +395,7 @@ final class PraticaController extends AbstractController
 
         return $this->riassunto($modello, $p, $voci, $manca) + [
             'modelloInfo' => $modello->vista(),
-            'consensoCifrati' => $p->haConsensoCifrati() ? ['da' => $p->getConsensoCifratiDa()?->getFullName(), 'il' => $p->getConsensoCifratiIl()?->format(\DATE_ATOM)] : null,
+            'consensoCifrati' => $p->haConsensoCifrati() ? ['da' => $p->getConsensoCifratiDa()?->getFullName(), 'il' => $p->getConsensoCifratiIl()?->format(\DATE_ATOM), 'dispositivi' => $p->haConsensoCifratiDispositivi()] : null,
             'nonServe' => $nonServe,
             'voci' => array_map(fn (array $x) => $this->vistaVoce($modello, $x['voce'], $x['valori'], $voci), $voci),
             'cosaManca' => array_map(static fn (array $m) => ['valori' => (object) $m['valori']] + $m, $manca),

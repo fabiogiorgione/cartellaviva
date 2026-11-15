@@ -146,6 +146,7 @@ class ModelliPratica
                     \is_string($c['confronta'] ?? null) ? $c['confronta'] : null,
                     true === ($c['soloUtente'] ?? false),
                     true === ($c['ultimo'] ?? false),
+                    true === ($c['serve'] ?? false),
                 );
             }
             if ([] === $campi) {

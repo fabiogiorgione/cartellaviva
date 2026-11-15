@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cartellaviva/widgets/modulo_validato.dart';
 import 'package:get/get.dart';
 import 'package:cartellaviva/helpers/services/api/api_exception.dart';
+import 'package:cartellaviva/helpers/services/sblocco_biometrico.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
 
 /// Schermata di blocco: per sbloccare si reinserisce la password dell'utente corrente
@@ -31,6 +32,7 @@ class LockController extends GetxController {
     update();
     try {
       final result = await SessionService.to.login(email, basicValidator.getData()['password'].toString());
+      SbloccoBiometrico.sblocca();
       if (result == LoginResult.twoFactorRequired) {
         Get.offAllNamed('/auth/two-factor');
       } else {

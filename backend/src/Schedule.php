@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\ConnettoreAi\Message\RiprendiLavoriAiMessage;
 use App\Ente\Message\AutomazioniEntiMessage;
 use App\Portale\Message\RiepilogoIdeeMessage;
 use App\Scadenze\Message\PromemoriaScadenzeMessage;
@@ -32,6 +33,8 @@ class Schedule implements ScheduleProviderInterface
             // add(), non with(): with() crea una nuova Schedule e perde le impostazioni sopra.
             ->add(
                 RecurringMessage::every('1 hour', new PuliziaPeriodicaMessage()),
+                // Connettore AI sul Mac: lavori scaduti o senza Mac online tornano al server.
+                RecurringMessage::every('1 minute', new RiprendiLavoriAiMessage()),
                 // Promemoria delle scadenze: ogni mattina alle 7 (ora italiana).
                 RecurringMessage::every('1 day', new PromemoriaScadenzeMessage(), new \DateTimeImmutable('07:00', new \DateTimeZone('Europe/Rome'))),
                 // Enti: rinnovi alla scadenza, richieste ricorrenti, conservazione (prima dei promemoria).

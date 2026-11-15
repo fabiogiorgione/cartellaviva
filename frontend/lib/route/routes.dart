@@ -1,3 +1,6 @@
+import 'package:cartellaviva/features/account/view/sblocco_screen.dart';
+import 'package:cartellaviva/helpers/services/sblocco_biometrico.dart';
+import 'package:cartellaviva/features/connettore_ai/collega_mac_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cartellaviva/helpers/services/auth_service.dart';
@@ -65,6 +68,10 @@ class AuthMiddleware extends GetMiddleware {
     final session = SessionService.to;
     final me = session.me;
     final target = route ?? '/';
+    // Sblocco con Face ID: prima di qualsiasi pagina con i dati.
+    if (SbloccoBiometrico.bloccato && !target.startsWith('/auth/')) {
+      return RouteSettings(name: '${SbloccoBiometrico.rotta}?next=${Uri.encodeComponent(target)}');
+    }
     // Onboarding: anagrafica obbligatoria, tranne per inviti e richieste degli enti.
     if (me != null && !me.profileCompleted && !SessionService.isOnboardingExempt(target)) {
       return RouteSettings(name: '/account/profile');
@@ -108,6 +115,7 @@ List<GetPage> getPageRoute() => [
       GetPage(name: route.twoFactor, page: () => TwoFactorScreen()),
       // Recupero dell'accesso e annullamento dal link dell'avviso: pubbliche.
       GetPage(name: '/auth/recupero', page: () => const RecuperoAccessoScreen()),
+      GetPage(name: SbloccoBiometrico.rotta, page: () => const SbloccoScreen()),
       GetPage(name: '/auth/recupero/conferma', page: () => const RecuperoAccessoScreen()),
       GetPage(name: '/procedure/annulla', page: () => const AnnullaProceduraScreen()),
       _authMiddleware('/admin', () => const PortaleSaluteScreen()),
@@ -118,6 +126,8 @@ List<GetPage> getPageRoute() => [
       _authMiddleware('/admin/team', () => const PortaleTeamScreen()),
       _authMiddleware('/admin/idee', () => const PortaleIdeeScreen()),
       _authMiddleware('/idee', () => const IdeeScreen()),
+      // Approvazione del Mac (connettore AI): il link mostrato sul Mac porta qui con ?codice=.
+      _authMiddleware('/collega-mac', () => const CollegaMacScreen()),
       _authMiddleware('/condivisioni', () => const CondivisioniScreen()),
       // Pubblica: link + codice di una condivisione esterna.
       GetPage(name: '/condivisione', page: () => const CondivisioneLinkScreen()),

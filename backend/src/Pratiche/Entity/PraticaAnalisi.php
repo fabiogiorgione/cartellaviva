@@ -2,6 +2,7 @@
 
 namespace App\Pratiche\Entity;
 
+use App\ConnettoreAi\Entity\ConnettoreAi;
 use App\Documenti\Entity\Documento;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -37,13 +38,28 @@ class PraticaAnalisi
     #[ORM\Column]
     private \DateTimeImmutable $analizzatoIl;
 
-    public function __construct(Pratica $pratica, Documento $documento, string $esito, string $metodo)
+    /** Modello usato (nome completo), per il registro e le misure. */
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $modello;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $durataMs;
+
+    /** Il connettore (Mac) che l'ha fatta: il registro resta anche se il Mac viene eliminato. */
+    #[ORM\ManyToOne(targetEntity: ConnettoreAi::class)]
+    #[ORM\JoinColumn(name: 'connettore_ai_id', nullable: true, onDelete: 'SET NULL')]
+    private ?ConnettoreAi $connettoreAi;
+
+    public function __construct(Pratica $pratica, Documento $documento, string $esito, string $metodo, ?string $modello = null, ?int $durataMs = null, ?ConnettoreAi $connettoreAi = null)
     {
         $this->pratica = $pratica;
         $this->documento = $documento;
         $this->esito = $esito;
-        $this->metodo = $metodo;
+        $this->metodo = mb_substr($metodo, 0, 20);
         $this->analizzatoIl = new \DateTimeImmutable();
+        $this->modello = null === $modello ? null : mb_substr($modello, 0, 100);
+        $this->durataMs = $durataMs;
+        $this->connettoreAi = $connettoreAi;
     }
 
     public function getEsito(): string

@@ -53,6 +53,11 @@ doctrine:
                 is_bundle: false
                 dir: '%kernel.project_dir%/src/Pratiche/Entity'
                 prefix: 'App\Pratiche\Entity'
+            ConnettoreAi:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/ConnettoreAi/Entity'
+                prefix: 'App\ConnettoreAi\Entity'
             Documenti:
                 type: attribute
                 is_bundle: false

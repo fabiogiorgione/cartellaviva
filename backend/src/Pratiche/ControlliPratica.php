@@ -33,6 +33,11 @@ final class ControlliPratica
         foreach (ValoriVoce::mancanti($r, $valori) as $etichetta) {
             $out[] = ['codice' => 'mancante', 'livello' => 'avviso', 'testo' => "Manca: $etichetta."];
         }
+        foreach ($r->campi as $codice => $c) {
+            if ($c->serve && !$c->obbligatorio && null === ($valori[$codice] ?? null)) {
+                $out[] = ['codice' => 'serve', 'livello' => 'avviso', 'testo' => sprintf('Manca %s: serve per presentare la pratica.', mb_strtolower($c->etichetta))];
+            }
+        }
         if ($r->perPersona && null === $voce->getPersona()) {
             $out[] = ['codice' => 'persona', 'livello' => 'avviso', 'testo' => 'Indica a quale persona si riferisce.'];
         }

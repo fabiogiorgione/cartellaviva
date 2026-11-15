@@ -41,8 +41,9 @@ class PraticheApi {
 
   static Future<void> elimina(String t, String id) => chiamaApi(() async => _dio.delete('/tenants/$t/pratiche/$id'));
 
-  static Future<Pratica> consensoCifrati(String t, String id, bool consenso) => chiamaApi(() async {
-        final r = await _dio.post('/tenants/$t/pratiche/$id/consenso-cifrati', data: {'consenso': consenso});
+  /// [dispositivi]: il consenso vale anche per i Mac collegati (connettore AI); null = non cambia.
+  static Future<Pratica> consensoCifrati(String t, String id, bool consenso, {bool? dispositivi}) => chiamaApi(() async {
+        final r = await _dio.post('/tenants/$t/pratiche/$id/consenso-cifrati', data: {'consenso': consenso, if (dispositivi != null) 'dispositivi': dispositivi});
         return Pratica.fromJson(_m(r.data));
       });
 

@@ -4,6 +4,7 @@ namespace App\Pratiche;
 
 use App\Account\Entity\User;
 use App\Documenti\DocumentService;
+use App\ConnettoreAi\Entity\ConnettoreAi;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Repository\CategoriaRepository;
 use App\Documenti\Repository\DocumentoRepository;
@@ -198,15 +199,18 @@ class PraticheService
     }
 
     /** Consenso (o revoca) per analizzare i documenti cifrati: una volta per pratica. */
-    public function consensoCifrati(Pratica $pratica, User $chi, bool $consenso): void
+    public function consensoCifrati(Pratica $pratica, User $chi, bool $consenso, ?bool $dispositivi = null): void
     {
         if ($consenso) {
             $pratica->daiConsensoCifrati($chi);
+            if (null !== $dispositivi) {
+                $pratica->consensoCifratiDispositivi($dispositivi);
+            }
         } else {
             $pratica->revocaConsensoCifrati();
         }
         $this->em->flush();
-        $this->log('pratica.consenso_cifrati', $pratica, ['consenso' => $consenso]);
+        $this->log('pratica.consenso_cifrati', $pratica, ['consenso' => $consenso, 'dispositivi' => $pratica->haConsensoCifratiDispositivi()]);
         if ($consenso) {
             $this->analizza($pratica);
         }
@@ -248,8 +252,7 @@ class PraticheService
      */
     public function lavoriTelefono(Pratica $pratica, int $caratteri, int $limite): array
     {
-        $modello = $this->modello($pratica);
-        $stato = $this->candidati->stato($modello, $pratica);
+        $stato = $this->candidati->stato($this->modello($pratica), $pratica);
         $lavori = [];
         foreach ($stato['daAnalizzare'] as $d) {
             if (\count($lavori) >= $limite) {
@@ -258,25 +261,42 @@ class PraticheService
             if (!$this->access->isGranted('documento:read', $d)) {
                 continue;
             }
-            $testo = (string) $this->testi->readOcrText($d);
-            $requisiti = '' === trim($testo) ? [] : EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d, $pratica), $pratica->analizzaTutti());
-            if ([] === $requisiti) {
-                // Cifrato senza parole utili: niente da chiedere al telefono.
-                $this->registraAnalisi($pratica, $d, PraticaAnalisi::NESSUNA, 'regole');
-                continue;
+            $lavoro = $this->lavoroPerDocumento($pratica, $d, $caratteri);
+            if (null !== $lavoro) {
+                $lavori[] = ['documentoId' => (string) $d->getId(), 'titolo' => $d->getTitolo()] + $lavoro;
             }
-            $richiesta = AiVociSuggeritore::richiesta($requisiti, $d->getNomeFileOriginale(), AiVociSuggeritore::testoPerModello($requisiti, $testo, $caratteri));
-            unset($testo);
-            $lavori[] = [
-                'documentoId' => (string) $d->getId(),
-                'titolo' => $d->getTitolo(),
-                'istruzioni' => AiVociSuggeritore::istruzioni($modello->titolo),
-                'prompt' => $richiesta['prompt'],
-                'schema' => json_encode($richiesta['schema'], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
-            ];
         }
 
         return ['lavori' => $lavori, 'restano' => \count($stato['daAnalizzare'])];
+    }
+
+    /**
+     * Istruzioni, prompt (con le parti utili del testo entro [caratteri]) e schema
+     * per far analizzare un documento a un modello su un dispositivo della
+     * famiglia (iPhone, Mac). Il testo, anche dei cifrati, vive solo in memoria.
+     * Null se non c'è niente da chiedere: l'analisi si registra subito.
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}|null
+     */
+    public function lavoroPerDocumento(Pratica $pratica, Documento $d, int $caratteri): ?array
+    {
+        $modello = $this->modello($pratica);
+        $testo = (string) $this->testi->readOcrText($d);
+        $requisiti = '' === trim($testo) ? [] : EstrattoreVoci::candidati($modello, $d->getCategoria()->getSlug(), $testo, $d->getNomeFileOriginale(), CandidatiPratica::vecchio($modello, $d, $pratica), $pratica->analizzaTutti());
+        if ([] === $requisiti) {
+            // Senza testo o senza parole utili: niente da chiedere al modello.
+            $this->registraAnalisi($pratica, $d, PraticaAnalisi::NESSUNA, 'regole');
+
+            return null;
+        }
+        $richiesta = AiVociSuggeritore::richiesta($requisiti, $d->getNomeFileOriginale(), AiVociSuggeritore::testoPerModello($requisiti, $testo, $caratteri));
+        unset($testo);
+
+        return [
+            'istruzioni' => AiVociSuggeritore::istruzioni($modello->titolo),
+            'prompt' => $richiesta['prompt'],
+            'schema' => json_encode($richiesta['schema'], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
+        ];
     }
 
     /**
@@ -289,9 +309,8 @@ class PraticheService
      */
     public function risultatoTelefono(Pratica $pratica, array $dati): int
     {
-        $modello = $this->modello($pratica);
         $d = $this->documento($pratica->getTenant(), $dati['documentoId'] ?? null);
-        if (null === $d || !$this->candidati->daGuardare($modello, $pratica, $d) || \in_array($d->getId()->toRfc4122(), $this->pratiche->documentiAnalizzati($pratica), true)) {
+        if (null === $d || !$this->daAnalizzare($pratica, $d)) {
             throw new Conflitto('Questo documento non è da analizzare (o è già stato analizzato).');
         }
         $versione = mb_substr(preg_replace('/[^\w.\-]/', '', (string) ($dati['modello'] ?? 'apple')) ?: 'apple', 0, 11);
@@ -300,7 +319,30 @@ class PraticheService
 
             return 0;
         }
-        $risposta = \is_string($dati['risposta'] ?? null) ? json_decode($dati['risposta'], true) : ($dati['risposta'] ?? null);
+
+        return $this->risultatoDispositivo($pratica, $d, $dati['risposta'] ?? null, VoceOrigine::AI_TELEFONO, 'tel:'.$versione);
+    }
+
+    /** Il documento è ancora da analizzare per la pratica (in ambito, non già analizzato)? */
+    public function daAnalizzare(Pratica $pratica, Documento $d): bool
+    {
+        return PraticaStato::IN_CORSO === $pratica->getStato()
+            && $this->candidati->daGuardare($this->modello($pratica), $pratica, $d)
+            && !\in_array($d->getId()->toRfc4122(), $this->pratiche->documentiAnalizzati($pratica), true);
+    }
+
+    /**
+     * Valori letti dal modello di un dispositivo (iPhone, Mac): si ricontrollano
+     * sul testo, si tolgono i doppioni, si cifrano e diventano proposte.
+     *
+     * @param array{modello?: ?string, durataMs?: ?int, connettore?: ?ConnettoreAi} $registro
+     *
+     * @return int voci proposte
+     */
+    public function risultatoDispositivo(Pratica $pratica, Documento $d, mixed $risposta, VoceOrigine $origine, string $metodo, array $registro = []): int
+    {
+        $modello = $this->modello($pratica);
+        $risposta = \is_string($risposta) ? json_decode($risposta, true) : $risposta;
         $testo = (string) $this->testi->readOcrText($d);
         $persone = $pratica->getPersone();
         $membri = array_values(array_filter($d->getMembri()->toArray(), static fn ($m) => \in_array($m, $persone, true)));
@@ -308,18 +350,19 @@ class PraticheService
         $voci = $this->doppioni->nuove($modello, $pratica, $voci);
         unset($testo);
         foreach ($voci as $v) {
-            $voce = new PraticaVoce($pratica, $v['requisito'], $v['persona'], $d, VoceStato::PROPOSTA, VoceOrigine::AI_TELEFONO);
+            $voce = new PraticaVoce($pratica, $v['requisito'], $v['persona'], $d, VoceStato::PROPOSTA, $origine);
             $this->cifratura->cifra($voce, $v['valori']);
             $this->em->persist($voce);
         }
-        $this->registraAnalisi($pratica, $d, [] === $voci ? PraticaAnalisi::NESSUNA : PraticaAnalisi::VOCI, 'tel:'.$versione);
+        $this->registraAnalisi($pratica, $d, [] === $voci ? PraticaAnalisi::NESSUNA : PraticaAnalisi::VOCI, $metodo, $registro);
 
         return \count($voci);
     }
 
-    private function registraAnalisi(Pratica $pratica, Documento $d, string $esito, string $metodo): void
+    /** @param array{modello?: ?string, durataMs?: ?int, connettore?: ?ConnettoreAi} $registro */
+    public function registraAnalisi(Pratica $pratica, Documento $d, string $esito, string $metodo, array $registro = []): void
     {
-        $this->em->persist(new PraticaAnalisi($pratica, $d, $esito, $metodo));
+        $this->em->persist(new PraticaAnalisi($pratica, $d, $esito, $metodo, $registro['modello'] ?? null, $registro['durataMs'] ?? null, $registro['connettore'] ?? null));
         $this->em->flush();
     }
 

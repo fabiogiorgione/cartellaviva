@@ -24,6 +24,13 @@ parameters:
     app.ricerca_margine: 0.1
     # Documenti simili per contenuto: distanza massima tra le parti più vicine.
     app.simili_distanza_max: 0.4
+    # Connettore AI sul Mac (docs/connettore-ai.md): modelli provati sul banco
+    # (app:pratiche:prova-cartella), se ammettere gli altri, dopo quanti secondi
+    # un lavoro senza Mac online torna al server, richieste di abbinamento per IP all'ora.
+    app.connettore_ai.modelli_verificati: ['qwen3:4b-instruct-2507-q4_K_M']
+    app.connettore_ai.sperimentali_ammessi: false
+    app.connettore_ai.attesa_massima: 600
+    app.connettore_device_limit: 5
 
 services:
     _defaults:
@@ -51,6 +58,7 @@ when@test:
         app.login_max_attempts: 1000
         app.public_auth_limit: 1000
         app.proposta_categoria_limit: 4
+        app.connettore_device_limit: 1000
         # FakeEmbedder (parole in comune) ha distanze più alte di bge-m3; senza parole in comune vale 1.
         app.ricerca_distanza_max: 0.9
 

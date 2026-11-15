@@ -5,6 +5,7 @@ namespace App\Pratiche\MessageHandler;
 use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Event\DocumentoOcrCompletatoEvent;
+use App\ConnettoreAi\LavoriAi;
 use App\Pratiche\CandidatiPratica;
 use App\Pratiche\DoppioniVoce;
 use App\Pratiche\Entity\Pratica;
@@ -46,6 +47,7 @@ final class AnalizzaDocumentoPraticaHandler
         private readonly LoggerInterface $logger,
         private readonly DoppioniVoce $doppioni,
         private readonly CandidatiPratica $candidati,
+        private readonly LavoriAi $lavoriAi,
     ) {
     }
 
@@ -76,6 +78,11 @@ final class AnalizzaDocumentoPraticaHandler
         $modello = $this->modelli->trova($pratica->getModello(), $pratica->getAnno());
         if (null === $modello || !$this->candidati->daGuardare($modello, $pratica, $documento)
             || null !== $this->em->find(PraticaAnalisi::class, ['pratica' => $pratica, 'documento' => $documento])) {
+            return;
+        }
+
+        // Un Mac della famiglia è online: il lavoro va a lui (docs/connettore-ai.md).
+        if (!$message->forzaServer && $this->lavoriAi->instrada($pratica, $documento)) {
             return;
         }
 

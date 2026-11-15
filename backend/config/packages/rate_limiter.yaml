@@ -13,6 +13,11 @@ framework:
             interval: '15 minutes'
         # Proposte di categoria con l'AI, per utente: il wizard ne chiede una per
         # documento (al massimo 50 per giro). Il limite ferma solo chi le chiede a raffica.
+        # Richieste di abbinamento di un Mac (connettore AI), per IP.
+        connettore_device:
+            policy: sliding_window
+            limit: '%app.connettore_device_limit%'
+            interval: '1 hour'
         proposta_categoria:
             policy: sliding_window
             limit: '%app.proposta_categoria_limit%'

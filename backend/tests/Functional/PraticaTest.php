@@ -8,6 +8,7 @@ use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
 use App\Documenti\Event\DocumentoOcrCompletatoEvent;
 use App\Pratiche\AiVociSuggeritore;
+use App\ConnettoreAi\LavoriAi;
 use App\Pratiche\CandidatiPratica;
 use App\Pratiche\DoppioniVoce;
 use App\Pratiche\EstrattoreVoci;
@@ -299,6 +300,9 @@ final class PraticaTest extends ApiTestCase
         $auto = $this->request('POST', $this->url("/pratiche/{$p['id']}/voci"), ['requisito' => 'veicoli', 'personaId' => $this->id($this->mario), 'valori' => ['targa' => 'ab 123 cd', 'tipo' => 'auto']], $this->token);
         self::assertSame('AB123CD', $auto['valori']['targa']);
         self::assertSame('3210.55', $this->dettaglio($p['id'])['riepilogo']['totale']);
+        // Un conto senza giacenza media si salva, ma avvisa che per la DSU serve.
+        $senza = $this->request('POST', $this->url("/pratiche/{$p['id']}/voci"), ['requisito' => 'rapporti', 'personaId' => $this->id($this->mario), 'valori' => ['importo' => '100,00', 'iban' => 'IT74L1234512345123456789018']], $this->token);
+        self::assertSame(['Manca giacenza media annua: serve per presentare la pratica.'], array_column(array_filter($senza['controlli'], static fn ($c) => 'serve' === $c['codice']), 'testo'));
 
         // DSU presentata: nasce la scadenza del rinnovo al 31 dicembre, una volta sola.
         $p = $this->request('PATCH', $this->url("/pratiche/{$p['id']}"), ['stato' => 'inviata'], $this->token);
@@ -511,6 +515,7 @@ final class PraticaTest extends ApiTestCase
             new NullLogger(),
             $c->get(DoppioniVoce::class),
             $c->get(CandidatiPratica::class),
+            $c->get(LavoriAi::class),
         );
     }
 

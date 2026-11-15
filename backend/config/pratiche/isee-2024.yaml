@@ -127,9 +127,9 @@ requisiti:
         campi:
             tipo: { tipo: scelta, etichetta: 'Rapporto' }
             emittente: { tipo: testo, etichetta: 'Banca o intermediario' }
-            iban: { tipo: iban, etichetta: 'IBAN' }
+            iban: { tipo: iban, etichetta: 'IBAN', serve: true }
             importo: { tipo: importo, etichetta: 'Saldo al 31/12', obbligatorio: true, ultimo: true, etichette: ['saldo al 31', 'saldo contabile al 31', 'saldo finale', 'saldo contabile', 'saldo'] }
-            giacenza: { tipo: importo, etichetta: 'Giacenza media annua', etichette: ['giacenza media', 'consistenza media'] }
+            giacenza: { tipo: importo, etichetta: 'Giacenza media annua', serve: true, etichette: ['giacenza media', 'consistenza media'] }
             saldo_precompilata: { tipo: importo, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
             giacenza_precompilata: { tipo: importo, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
 
@@ -167,7 +167,7 @@ requisiti:
         campi:
             tipo: { tipo: scelta, etichetta: 'Immobile' }
             descrizione: { tipo: testo, etichetta: 'Quale (indirizzo o dati catastali)', libero: true }
-            importo: { tipo: importo, etichetta: 'Rendita o valore IMU', etichette: ['rendita', 'valore ai fini imu'] }
+            importo: { tipo: importo, etichetta: 'Rendita o valore IMU', serve: true, etichette: ['rendita', 'valore ai fini imu'] }
             mutuo_residuo: { tipo: importo, etichetta: 'Mutuo residuo al 31/12', etichette: ['debito residuo', 'capitale residuo'] }
 
     veicoli:

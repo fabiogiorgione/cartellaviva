@@ -80,7 +80,7 @@ final class OwnershipTransferTest extends ApiTestCase
     public function testHourlyCleanupIsScheduledAndRemovesExpiredOAuthStates(): void
     {
         $messages = (new Schedule(static::getContainer()->get('cache.app')))->getSchedule()->getRecurringMessages();
-        self::assertCount(4, $messages, 'pulizia oraria + promemoria scadenze + automazioni enti + riepilogo idee');
+        self::assertCount(5, $messages, 'pulizia oraria + lavori del connettore AI + promemoria scadenze + automazioni enti + riepilogo idee');
 
         $source = new ImportSource($this->fresh($this->tenant), $this->fresh($this->owner), ImportProvider::GOOGLE_DRIVE, 'radice', ImportStrategia::CARTELLE);
         $source->beginOAuth(str_repeat('a', 64), $this->fresh($this->owner), new \DateTimeImmutable('-1 minute'), 'web');

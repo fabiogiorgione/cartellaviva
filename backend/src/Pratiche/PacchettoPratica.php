@@ -119,20 +119,39 @@ class PacchettoPratica
         $html .= '</table>';
 
         foreach ($modello->requisiti as $r) {
-            $righe = array_filter($confermate, static fn (array $x) => $x['voce']->getRequisito() === $r->codice);
+            $righe = array_values(array_filter($confermate, static fn (array $x) => $x['voce']->getRequisito() === $r->codice));
             if ([] === $righe) {
                 continue;
             }
-            $html .= '<h2>'.$h($r->etichetta).'</h2><table><tr><th>Persona</th><th>Data</th><th>Tipo</th><th>Emittente</th><th>Tracciabile</th><th class="n">Importo</th></tr>';
+            // Le colonne sono i campi del requisito: un conto ha IBAN, saldo e giacenza, un'auto la targa.
+            $campi = array_filter($r->campi, static fn ($c) => !$c->soloUtente || [] !== array_filter($righe, static fn ($x) => null !== ($x['valori'][$c->codice] ?? null)));
+            if ($r->perPersona) {
+                usort($righe, static fn ($a, $b) => ($a['voce']->getPersona()?->getDisplayName() ?? '') <=> ($b['voce']->getPersona()?->getDisplayName() ?? ''));
+            }
+            $html .= '<h2>'.$h($r->etichetta).'</h2><table><tr>'.($r->perPersona ? '<th>Persona</th>' : '');
+            foreach ($campi as $c) {
+                $html .= '<th'.('importo' === $c->tipo ? ' class="n"' : '').'>'.$h($c->etichetta).'</th>';
+            }
+            $html .= '</tr>';
             foreach ($righe as $x) {
                 $v = $x['valori'];
-                $controlli = ControlliPratica::voce($modello, $x['voce'], $v, $tutte);
-                $html .= '<tr><td>'.$h($x['voce']->getPersona()?->getDisplayName() ?? 'Famiglia').'</td><td>'.$dataIt($v['data'] ?? null).'</td>'
-                    .'<td>'.$h($r->tipo($v['tipo'] ?? null)?->etichetta).'</td><td>'.$h($v['emittente'] ?? $x['voce']->getDocumento()?->getTitolo()).'</td>'
-                    .'<td>'.$h(['si' => 'Sì', 'no' => 'No (contanti)', 'non_risulta' => 'Non risulta'][$v['tracciabile'] ?? ''] ?? '').'</td><td class="n">'.$euro($v['importo'] ?? null).'</td></tr>';
-                foreach ($controlli as $c) {
-                    if ('avviso' === $c['livello']) {
-                        $html .= '<tr><td></td><td colspan="5" class="avviso">'.$h($c['testo']).'</td></tr>';
+                $html .= '<tr>'.($r->perPersona ? '<td>'.$h($x['voce']->getPersona()?->getDisplayName() ?? '').'</td>' : '');
+                foreach ($campi as $c) {
+                    $valore = $v[$c->codice] ?? null;
+                    $testo = match ($c->tipo) {
+                        'importo' => $euro(null === $valore ? null : (string) $valore),
+                        'data' => $dataIt(null === $valore ? null : (string) $valore),
+                        'scelta' => $r->tipo(null === $valore ? null : (string) $valore)->etichetta ?? '',
+                        'tracciabile' => ['si' => 'Sì', 'no' => 'No (contanti)', 'non_risulta' => 'Non risulta'][(string) $valore] ?? '',
+                        'iban' => null === $valore ? '' : trim(chunk_split((string) $valore, 4, ' ')),
+                        default => (string) ($valore ?? ('emittente' === $c->codice ? $x['voce']->getDocumento()?->getTitolo() : '')),
+                    };
+                    $html .= '<td'.('importo' === $c->tipo ? ' class="n"' : '').'>'.$h($testo).'</td>';
+                }
+                $html .= '</tr>';
+                foreach (ControlliPratica::voce($modello, $x['voce'], $v, $tutte) as $controllo) {
+                    if ('avviso' === $controllo['livello']) {
+                        $html .= '<tr><td></td><td colspan="'.\count($campi).'" class="avviso">'.$h($controllo['testo']).'</td></tr>';
                     }
                 }
             }

@@ -23,6 +23,8 @@ final class Campo
         public readonly bool $soloUtente = false,
         /** tra più importi vicini alle etichette vale l'ultimo (il saldo di fine anno in un estratto con i saldi di ogni mese) */
         public readonly bool $ultimo = false,
+        /** non obbligatorio per proporre o confermare la voce, ma serve per presentare la pratica (avviso se manca) */
+        public readonly bool $serve = false,
     ) {
     }
 
