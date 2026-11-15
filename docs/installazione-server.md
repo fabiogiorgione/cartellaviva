@@ -68,7 +68,7 @@ Poi, sul server:
 4. chiede l'email dell'amministratore della piattaforma (superadmin) e la sua password;
 5. controlla che `https://<dominio>` risponda.
 
-La registrazione libera è **chiusa** (`REGISTRAZIONE_APERTA=0` nel file `.env`): nessuno può crearsi un account da solo, si entra solo su invito. Vedi il README, "Registrazione aperta o chiusa".
+La registrazione libera è **chiusa** (`REGISTRAZIONE_APERTA=0` nel file `.env`): nessuno può crearsi un account da solo, si entra solo su invito. Vedi [accesso.md](accesso.md), "Registrazione aperta o chiusa".
 
 ## 5. Subito dopo: backup della master key
 

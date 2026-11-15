@@ -31,7 +31,7 @@ Se il pulsante non compare, apri una issue che chieda soltanto un contatto priva
 - link pubblici con token: condivisioni esterne, risposte senza account, esportazioni, firma con codice;
 - documenti o testo estratto che escono dal server verso servizi esterni.
 
-I limiti già noti sono elencati nel [README](README.md#limiti-noti-e-da-fare): non serve segnalarli di nuovo.
+I limiti già noti sono elencati nel [docs/limiti.md](docs/limiti.md): non serve segnalarli di nuovo.
 
 ## Come provare
 

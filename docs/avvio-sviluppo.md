@@ -118,7 +118,7 @@ flutter run -d web-server --web-port 5000 --web-hostname 0.0.0.0 \
 - Si usa `web-server` e non `chrome` perché Chrome non è installato dentro WSL. Il server gira in WSL e lo apri con il browser di Windows: `localhost` è condiviso.
 - La porta **5000** non è casuale: è quella dei link nelle email (`FRONTEND_URL`). Il CORS di sviluppo accetta qualsiasi porta di `localhost`.
 - **Su Mac** la 5000 è spesso occupata dal Ricevitore AirPlay di macOS ("Address already in use"). Disattivalo nelle Impostazioni di Sistema (cerca "AirPlay"), oppure usa un'altra porta, ad esempio `--web-port 5050`, e scrivila nel file `.env` accanto a `compose.yaml` (`FRONTEND_URL=http://localhost:5050`), poi lancia `docker compose up -d`.
-- Opzionale: con `--dart-define=GOOGLE_WEB_CLIENT_ID=…` si attiva l'accesso con Google (vedi README, "Accesso con Google").
+- Opzionale: con `--dart-define=GOOGLE_WEB_CLIENT_ID=…` si attiva l'accesso con Google (vedi [accesso.md](accesso.md), "Accesso con Google").
 
 ### Debug con VS Code
 
@@ -186,7 +186,7 @@ Per provarlo su un telefono o su un emulatore con il debug collegato, il modo pi
 
 Da un telefono o da un emulatore, `localhost` non è il PC: compila con `--dart-define=API_BASE_URL=http://<IP del PC>:8090/api`, oppure `http://10.0.2.2:8090/api` dall'emulatore Android.
 
-Notifiche push e documenti offline funzionano solo nell'app per telefono; per le push servono le credenziali Firebase (README, "Notifiche push").
+Notifiche push e documenti offline funzionano solo nell'app per telefono; per le push servono le credenziali Firebase ([famiglia.md](famiglia.md), "Notifiche push").
 
 ## 9. Problemi comuni
 
@@ -195,7 +195,7 @@ Notifiche push e documenti offline funzionano solo nell'app per telefono; per le
 | `docker: command not found` o "failed to connect to the docker API" | Docker Desktop è spento o non ha l'integrazione WSL attiva. Avvialo e riprova. |
 | L'app si apre ma l'accesso fallisce (errore di rete) | L'API non è su: `docker compose ps`, poi `docker compose up -d`. |
 | "address already in use" sulla porta 5000 | C'è già un'altra istanza: chiudila (`q`), oppure trova il processo con `ss -ltnp \| grep 5000` (su Mac `lsof -nP -iTCP:5000 -sTCP:LISTEN`). Su Mac, se il processo è `ControlCenter`, è il Ricevitore AirPlay: vedi la nota sulla porta nel paragrafo 5. |
-| L'API risponde con errore 500 (`APP_ENCRYPTION_KEY deve essere una chiave di 32 byte`) | Mancano i segreti di questa installazione in `backend/.env.local`: lancia `bash scripts/setup-sviluppo.sh`, oppure generali come nel README ("Avvio (sviluppo)", passo 1) e rigenera le chiavi JWT con `lexik:jwt:generate-keypair --overwrite -n`. |
+| L'API risponde con errore 500 (`APP_ENCRYPTION_KEY deve essere una chiave di 32 byte`) | Mancano i segreti di questa installazione in `backend/.env.local`: lancia `bash scripts/setup-sviluppo.sh`, oppure generali come in [avvio-sviluppo-a-mano.md](avvio-sviluppo-a-mano.md) (passo 1) e rigenera le chiavi JWT con `lexik:jwt:generate-keypair --overwrite -n`. |
 | Le email non arrivano | Sono tutte su Mailpit, http://localhost:8025: in sviluppo nessuna email esce davvero. |
 | Un campo nuovo del backend non compare nelle risposte (o l'app dà errori dopo un aggiornamento) | API Platform tiene in cache la descrizione delle risorse: `docker compose exec php php bin/console cache:clear`, **poi** `docker compose restart worker` (il worker usa la stessa cache: se la si svuota mentre gira, si blocca sul messaggio che sta elaborando). |
 | Anteprima dei DOCX "non disponibile" | Controlla che giri il convertitore (`docker compose ps convertitore`) e la voce "Convertitore documenti" in Salute e da fare; poi "Riprova la conversione" nella scheda, oppure `docker compose exec php php bin/console app:anteprime:genera --fallite`. |

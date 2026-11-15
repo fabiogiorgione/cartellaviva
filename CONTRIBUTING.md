@@ -19,7 +19,7 @@ Nelle issue non incollare documenti, schermate o log con dati personali reali, t
 
 ## Provare il progetto in locale
 
-I passi sono nel [README](README.md#avvio-sviluppo) e, in dettaglio, in [docs/avvio-sviluppo.md](docs/avvio-sviluppo.md). In breve:
+I passi sono nel [README](README.md#provarlo) e, in dettaglio, in [docs/avvio-sviluppo.md](docs/avvio-sviluppo.md). In breve:
 
 ```bash
 bash scripts/setup-sviluppo.sh     # container, dipendenze, database e dati di demo
@@ -45,7 +45,7 @@ Serve a leggere il codice oggi e varrà per i contributi quando saranno aperti.
 - **Backend**: un modulo per area (`Account`, `Documenti`, `Ente`, `Scadenze`, `Tenancy`...). I controller restano sottili: la logica sta nei servizi, le query nei repository. Gli errori di dominio sono in `Shared\Errore`.
 - **Frontend**: una cartella per funzione in `lib/features`, con `api`, `controller`, `model` e `view`. I colori si leggono dal tema (`context.colori`), non si scrivono nei widget.
 - **Test**: una modifica al comportamento arriva con il suo test.
-- **Missione**: nessuna chiamata a servizi di AI esterni e nessun documento che esce dal server. I quattro impegni del [README](README.md#i-quattro-impegni) valgono per ogni modifica.
+- **Missione**: nessuna chiamata a servizi di AI esterni e nessun documento mandato a terzi: l'AI gira sul server di CartellaViva o su un dispositivo della famiglia (Mac, iPhone). I quattro impegni del [README](README.md#i-quattro-impegni) valgono per ogni modifica.
 
 ## Licenza
 
