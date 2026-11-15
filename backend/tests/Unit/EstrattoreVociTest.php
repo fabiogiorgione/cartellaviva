@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit;
 
+use App\Documenti\Ocr\TesseractOcrEngine;
 use App\Pratiche\AiVociSuggeritore;
 use App\Pratiche\EstrattoreVoci;
 use App\Pratiche\Modello\ModelliPratica;
@@ -136,6 +137,65 @@ final class EstrattoreVociTest extends TestCase
         // Un curriculum cita la patente; un foglio sulla servitù cita una targa: non sono documenti per l'ISEE.
         self::assertSame([], $codici("Curriculum vitae\nEsperienza lavorativa\nPatente di guida B", 'cv.pdf'));
         self::assertSame([], $codici('Registro violazioni servitù: auto targa AB123CD parcheggiata', 'registro.xlsx'));
+    }
+
+    public function testDocumentsOfAnotherReferenceYear(): void
+    {
+        // ISEE 2026: redditi e patrimonio del 2024.
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        $codici = static fn (string $testo, bool $tutti = false): array => array_map(static fn (Requisito $r) => $r->codice, EstrattoreVoci::candidati($isee, null, $testo, 'x.pdf', false, $tutti));
+
+        self::assertSame([2023], TestoVoci::anniDichiarati("CERTIFICAZIONE UNICA 2024\nRELATIVA ALL’ANNO 2023"));
+        self::assertSame([2022], TestoVoci::anniDichiarati('MODELLO 730/2023 Redditi 2022'));
+        self::assertSame([2023], TestoVoci::anniDichiarati("Dichiarazione 730 2024 (Anno di imposta 2023)"));
+        self::assertSame([2021], TestoVoci::anniDichiarati('SALDO CONTABILE AL 31/12/2021'));
+        self::assertSame([2023, 2024], TestoVoci::anniDichiarati("Saldo iniziale al 31.12.2023\nEstratto conto al 31.12.2024"));
+        self::assertSame([2022], TestoVoci::anniDichiarati("Giacenza media riferita all'anno 2022"));
+        self::assertSame([], TestoVoci::anniDichiarati('Estratto conto, giacenza media annua euro 2.874,10'));
+        self::assertSame([], TestoVoci::anniDichiarati('CU: TFR maturato fino al 31/12/2000'));
+
+        // La CU e il 730 dell'anno prima non servono; quelli giusti sì.
+        self::assertSame([], $codici("Certificazione Unica 2024\nrelativa all'anno 2023"));
+        self::assertSame(['redditi'], $codici("Certificazione Unica 2025\nrelativa all'anno 2024"));
+        self::assertSame([], $codici("Estratto conto al 31.12.2023\ngiacenza media 1.200,00"));
+        self::assertSame(['rapporti'], $codici("Estratto conto al 31.12.2024\ngiacenza media 1.200,00"));
+        // Se non dice l'anno, o se l'ha scelto a mano ("analizza tutti"), resta.
+        self::assertSame(['rapporti'], $codici('Estratto conto, giacenza media 1.200,00'));
+        self::assertContains('redditi', $codici("Certificazione Unica 2024\nrelativa all'anno 2023", true));
+        // I documenti che non scadono valgono anche se dicono un altro anno.
+        self::assertSame(['immobili'], $codici('Visura catastale al 31/12/2019, rendita catastale euro 247,90'));
+        // Un fondo pensione non è un conto; il modulo del contributo carburante non è un libretto.
+        self::assertSame([], $codici('Estratto conto previdenza complementare: posizione individuale, prestazioni pensionistiche'));
+        // Un conto vuoto si dichiara lo stesso: saldo e giacenza a zero.
+        $vuoto = $this->estrattore(json_encode(['voci' => [['requisito' => 'rapporti', 'tipo' => 'conto', 'importo' => '0,00', 'giacenza' => '0,00']]]))
+            ->estrai($isee, null, 'ec.pdf', "Estratto conto al 31.12.2024\n0,00\n31/12/24 SALDO FINALE\nGIACENZA MEDIA\n0,00 EUR", [], null)['voci'];
+        self::assertSame(['0.00', '0.00'], [$vuoto[0]['valori']['importo'] ?? null, $vuoto[0]['valori']['giacenza'] ?? null]);
+        self::assertNull(ValoriVoce::centesimi('0,00'));
+        self::assertSame(0, ValoriVoce::centesimi('0,00', true));
+        self::assertSame([], $codici('Domanda contributo sull’acquisto del carburante: veicolo come da carta di circolazione; contratto di locazione finanziaria'));
+    }
+
+    public function testAccountValuesFromStatementLayouts(): void
+    {
+        $isee = (new ModelliPratica(\dirname(__DIR__, 2).'/config/pratiche'))->trova('isee', 2026);
+        $valori = fn (array $ai, string $testo): array => $this->estrattore(json_encode(['voci' => [['requisito' => 'rapporti', 'tipo' => 'conto'] + $ai]]))->estrai($isee, null, 'ec.pdf', $testo, [], null)['voci'][0]['valori'] ?? [];
+
+        // Separatore delle migliaia come carattere di controllo (alcuni estratti conto).
+        self::assertSame("Saldo finale al 31.12.2024 1.834,56\n", TesseractOcrEngine::senzaControllo("Saldo finale al 31.12.2024 1\x19834,56\x07\n"));
+
+        // L'IBAN di un bonifico non è quello del conto.
+        $testo = "Estratto conto al 31.12.2024\nCOORDINATE BANCARIE\nIBAN IT03 H123 4567 8900 0000 0000 001\nDISPOSIZIONI DI BONIFICO\nA Fav: MARIO ROSSI IBAN: IT60X0542811101000000123456 ID\nSaldo finale al 31.12.2024 1.000,00\nGiacenza media 900,00";
+        self::assertSame('IT03H1234567890000000000001', $valori(['iban' => 'IT60X0542811101000000123456', 'importo' => '1.000,00'], $testo)['iban']);
+        self::assertSame(['IT03H1234567890000000000001'], TestoVoci::iban($testo, true));
+
+        // Senza giacenza media nel documento, il saldo ricopiato dall'AI non diventa la giacenza.
+        $saldo = $valori(['importo' => '12.345,67', 'giacenza' => '12.345,67'], 'Saldo contabile al 31/12/2024: + 12.345,67 € IT77I1234567890000000000002');
+        self::assertSame('12345.67', $saldo['importo']);
+        self::assertArrayNotHasKey('giacenza', $saldo);
+
+        // Polizza vita: i premi versati, non il valore del capitale.
+        $polizza = $this->estrattore(json_encode(['voci' => [['requisito' => 'polizze', 'tipo' => 'polizza_vita', 'importo' => '6.123,45']]]))->estrai($isee, null, 'p.pdf', "Documento Unico di Rendicontazione\nGestione separata\nVersamenti totali al 15/03/2024 5.000,00 euro\nValore del capitale al 15/03/2024 6.123,45 euro", [], null)['voci'];
+        self::assertSame('5000.00', $polizza[0]['valori']['importo']);
     }
 
     public function testLabelledAmountsBeatModelValuesFarFromTheLabel(): void

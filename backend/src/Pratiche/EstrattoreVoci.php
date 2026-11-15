@@ -40,6 +40,8 @@ class EstrattoreVoci
      * Requisiti di cui il documento può parlare, per parole chiave nel testo o
      * nel nome del file (o per categoria). $vecchio: il documento è più vecchio
      * della finestra della pratica, e valgono solo i requisiti "ancheVecchi".
+     * Lo stesso se il testo dichiara un altro anno di riferimento (la CU o il
+     * 730 dell'anno prima, caricati di recente). Con $tutti ogni anno vale.
      *
      * @return list<Requisito>
      */
@@ -48,6 +50,7 @@ class EstrattoreVoci
         $basso = Requisito::normale($testo);
         $nome = Requisito::nomeNormale($nomeFile);
         $punteggi = [];
+        $vecchio = $vecchio || (!$tutti && TestoVoci::altroAnno($testo, $modello->annoRiferimento()));
         foreach ($modello->requisiti as $r) {
             if ($vecchio && !$r->ancheVecchi) {
                 continue;
@@ -188,13 +191,26 @@ class EstrattoreVoci
         return ['requisito' => $r->codice, 'persona' => $this->persona($r, $g['persona'] ?? null, $testo, $persone, $personaDocumento, $nomeFile), 'valori' => $valori];
     }
 
+    /** @param list<string> $etichette minuscole */
+    private static function nominaEtichetta(string $testo, array $etichette): bool
+    {
+        $basso = Requisito::normale($testo);
+        foreach ($etichette as $e) {
+            if (str_contains($basso, Requisito::normale($e))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * L'importo dell'AI vale solo se compare nel testo; altrimenti le regole:
      * vicino alle etichette del campo, o il totale per il primo importo.
      */
     private function importo(Campo $campo, ?string $ai, string $testo, bool $primo): ?string
     {
-        $c = ValoriVoce::centesimi($ai);
+        $c = ValoriVoce::centesimi($ai, $campo->zero);
         if (null !== $c && !TestoVoci::importoNelTesto($c, $testo)) {
             $c = null;
         }
@@ -203,11 +219,15 @@ class EstrattoreVoci
             // vicino a una di esse: un modello piccolo scambia facilmente il saldo per la
             // giacenza. Altrimenti vale l'importo trovato accanto all'etichetta.
             // Con "ultimo" (il saldo di fine anno) vale sempre l'ultimo importo accanto all'etichetta.
-            $vicini = TestoVoci::importiVicini($testo, $campo->etichette);
+            $vicini = TestoVoci::importiVicini($testo, $campo->etichette, $campo->zero);
             if ($campo->ultimo && [] !== $vicini) {
                 $c = $vicini[\count($vicini) - 1];
             } elseif ([] !== $vicini && (null === $c || !\in_array($c, $vicini, true))) {
                 $c = $vicini[0];
+            } elseif ([] === $vicini && !$campo->obbligatorio && !self::nominaEtichetta($testo, $campo->etichette)) {
+                // Il documento non nomina proprio il campo (un saldo senza giacenza media):
+                // il valore dell'AI è un altro importo, di solito il saldo ricopiato.
+                $c = null;
             }
         } elseif (null === $c && $primo) {
             $c = TestoVoci::importoTotale($testo);
@@ -219,7 +239,9 @@ class EstrattoreVoci
     /** L'IBAN dell'AI vale se è valido e nel testo; altrimenti il primo IBAN valido del testo. */
     private static function ibanDaAi(?string $ai, string $testo): ?string
     {
-        $nelTesto = TestoVoci::iban($testo);
+        // L'IBAN di un bonifico (beneficiario, ordinante) non è quello del conto.
+        $delConto = TestoVoci::iban($testo, true);
+        $nelTesto = [] === $delConto ? TestoVoci::iban($testo) : $delConto;
         $ai = null === $ai ? '' : strtoupper((string) preg_replace('/\s+/', '', $ai));
 
         return \in_array($ai, $nelTesto, true) ? $ai : ($nelTesto[0] ?? null);

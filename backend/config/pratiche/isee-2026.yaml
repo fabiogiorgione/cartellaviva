@@ -73,7 +73,7 @@ requisiti:
         somma: false
         data: dopo
         riconosci:
-            parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'certificazione lavoro dipendente', 'originale per il percipiente', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'sostituto di imposta', 'prospetto di liquidazione']
+            parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'certificazione lavoro dipendente', 'originale per il percipiente', 'modello 730', 'redditi persone fisiche', 'sostituto d''imposta', 'sostituto di imposta', 'prospetto di liquidazione', 'dichiarazione 730']
             senza: ['attestazione isee']
         tipi:
             cu: { etichetta: 'Certificazione Unica', parole: ['certificazione unica', 'certificazione di cui all''art. 4', 'originale per il percipiente', 'certificazione lavoro dipendente'] }
@@ -112,7 +112,7 @@ requisiti:
         scopri: iban
         riconosci:
             parole: ['estratto conto', 'giacenza media', 'saldo contabile', 'comunicazione annuale', 'documento di sintesi', 'libretto di risparmio', 'deposito titoli', 'consistenza media', 'dichiarazione isee']
-            senza: ['attestazione isee', 'documento unico di rendicontazione']
+            senza: ['attestazione isee', 'documento unico di rendicontazione', 'previdenza complementare', 'prestazioni pensionistiche']
         tipi:
             conto: { etichetta: 'Conto corrente', parole: ['conto corrente', 'c/c'] }
             libretto: { etichetta: 'Libretto di risparmio', parole: ['libretto'] }
@@ -123,14 +123,14 @@ requisiti:
             tipo: { tipo: scelta, etichetta: 'Rapporto' }
             emittente: { tipo: testo, etichetta: 'Banca o intermediario' }
             iban: { tipo: iban, etichetta: 'IBAN', serve: true }
-            importo: { tipo: importo, etichetta: 'Saldo al 31/12', obbligatorio: true, ultimo: true, etichette: ['saldo al 31', 'saldo contabile al 31', 'saldo finale', 'saldo contabile', 'saldo'] }
-            giacenza: { tipo: importo, etichetta: 'Giacenza media annua', serve: true, etichette: ['giacenza media', 'consistenza media'] }
-            saldo_precompilata: { tipo: importo, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
-            giacenza_precompilata: { tipo: importo, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
+            importo: { tipo: importo, zero: true, etichetta: 'Saldo al 31/12', obbligatorio: true, ultimo: true, etichette: ['saldo al 31', 'saldo contabile al 31', 'saldo finale', 'saldo contabile', 'saldo'] }
+            giacenza: { tipo: importo, zero: true, etichetta: 'Giacenza media annua', serve: true, etichette: ['giacenza media', 'consistenza media'] }
+            saldo_precompilata: { tipo: importo, zero: true, etichetta: 'Saldo nella DSU precompilata', soloUtente: true, confronta: importo }
+            giacenza_precompilata: { tipo: importo, zero: true, etichetta: 'Giacenza nella DSU precompilata', soloUtente: true, confronta: giacenza }
 
     polizze:
         etichetta: 'Polizze vita e investimenti assicurativi'
-        descrizione: 'Polizze vita a contenuto finanziario (ramo I, III, V): dal rendiconto annuale della compagnia, i premi versati o il valore al 31 dicembre.'
+        descrizione: 'Polizze vita a contenuto finanziario (ramo I, III, V): dal rendiconto annuale della compagnia, i premi versati in tutto fino al 31 dicembre, meno gli eventuali riscatti (non il valore del capitale).'
         per: persona
         data: libera
         riconosci:
@@ -142,7 +142,7 @@ requisiti:
         campi:
             tipo: { tipo: scelta, etichetta: 'Tipo' }
             emittente: { tipo: testo, etichetta: 'Compagnia' }
-            importo: { tipo: importo, etichetta: 'Premi versati o valore al 31/12', obbligatorio: true, ultimo: true, etichette: ['valore del capitale al', 'valore netto in caso di riscatto', 'valore di riscatto', 'capitale maturato', 'prestazione maturata', 'controvalore', 'premi versati'] }
+            importo: { tipo: importo, etichetta: 'Premi versati al 31/12', obbligatorio: true, ultimo: true, etichette: ['versamenti totali', 'premi complessivamente versati', 'totale premi versati', 'premi versati', 'totale versamenti', 'valore del capitale al', 'valore netto in caso di riscatto', 'valore di riscatto', 'capitale maturato', 'prestazione maturata', 'controvalore'] }
             data: { tipo: data, etichetta: 'Data del rendiconto' }
 
     immobili:
@@ -175,8 +175,8 @@ requisiti:
         scopri: targa
         riconosci:
             categorie: [veicoli]
-            parole: ['carta di circolazione', 'libretto di circolazione', 'certificato di proprieta', 'tassa automobilistica', 'bollo auto']
-            senza: ['attestazione isee']
+            parole: ['carta di circolazione', 'libretto di circolazione', 'certificato di proprieta', 'tassa automobilistica', 'bollo auto', 'prima immatricolazione']
+            senza: ['attestazione isee', 'contributo sull''acquisto del carburante', 'contributo per l''acquisto di carburante']
         tipi:
             auto: { etichetta: 'Auto', parole: ['autovettura', 'auto'] }
             moto: { etichetta: 'Moto', parole: ['motociclo', 'moto'] }
@@ -195,7 +195,7 @@ requisiti:
         ancheVecchi: true
         riconosci:
             parole: ['contratto di locazione', 'canone di locazione', 'canone annuo']
-            senza: ['modello 730', 'attestazione isee']
+            senza: ['modello 730', 'attestazione isee', 'locazione finanziaria']
         tipi:
             abitazione: { etichetta: 'Abitazione del nucleo' }
         campi:

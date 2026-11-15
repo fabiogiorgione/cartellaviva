@@ -177,7 +177,7 @@ class CandidatiPratica
                 if (($vecchio && !$r->ancheVecchi) || (!$pratica->analizzaTutti() && !$r->parlaDi($basso, $nome) && !\in_array($d->getCategoria()->getSlug(), $r->categorie, true))) {
                     continue;
                 }
-                foreach ('iban' === $r->scopri ? TestoVoci::iban($testo) : TestoVoci::targhe($testo) as $codice) {
+                foreach ('iban' === $r->scopri ? TestoVoci::iban($testo, true) : TestoVoci::targhe($testo) as $codice) {
                     $out[$r->codice][$codice] = true;
                 }
             }

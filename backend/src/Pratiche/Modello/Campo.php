@@ -25,6 +25,8 @@ final class Campo
         public readonly bool $ultimo = false,
         /** non obbligatorio per proporre o confermare la voce, ma serve per presentare la pratica (avviso se manca) */
         public readonly bool $serve = false,
+        /** l'importo può valere zero (il saldo di un conto vuoto va dichiarato lo stesso) */
+        public readonly bool $zero = false,
     ) {
     }
 

@@ -246,7 +246,18 @@ Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, pr
 
 - **Importi con etichetta** (`TestoVoci::importiVicini`, `EstrattoreVoci::importo`): il valore dell'AI vale solo se sta accanto a un'etichetta del campo (dopo, prima, o nella stessa colonna di una tabella con l'intestazione); altrimenti vale l'importo trovato accanto all'etichetta. Così una visura con più immobili tiene una rendita per voce. Gli spazi di allineamento non contano per l'etichetta sulla stessa riga.
 - **`ultimo: true`** sul campo: tra più importi accanto all'etichetta vale l'ultimo (il saldo di fine anno in un estratto con i saldi mensili; il valore del capitale di fine periodo di una polizza).
+- **`zero: true`** sul campo: l'importo può valere zero. Sui conti (saldo, giacenza e i valori della precompilata): un conto aperto a fine anno e ancora vuoto va dichiarato lo stesso, prima si perdeva.
 - **Tipo dal titolo** (`AiVociSuggeritore::tipoValido`): una frase di un tipo nei primi 1.500 caratteri o nel nome del file vince sul tipo dell'AI ("Certificazione Unica" in testa è una CU anche se l'AI dice 730). Solo frasi di più parole: "farmac" in cima a uno scontrino è il nome della farmacia.
+
+**Le annate 2020–2025 come banco** (15/11/2026, cartelle ISEE vere dell'autore, fuori dal repository): selezione giusta su tutti i file di 2020, 2023, 2024, 2025 e 2026; con l'AI la voce del requisito giusto in tutti i documenti che ne aspettano una. Correzioni nate da qui:
+
+- **Anno dichiarato dal documento** (`TestoVoci::anniDichiarati`, `EstrattoreVoci::candidati`): "relativa all'anno 2022", "730/2023 Redditi 2022", "anno d'imposta", "anno riferimento", "riferita all'anno", "al 31.12.2022". Se il documento dichiara solo anni diversi da quello di riferimento della pratica vale come vecchio: niente CU, 730 o estratti conto dell'anno prima, anche se caricati da poco (prima contava solo la data del documento). Se non dichiara niente, o con "analizza tutti", resta. "Fino al 31/12/2000" (il TFR nella CU) non conta.
+- Un fondo pensione non è un conto (`senza` "previdenza complementare", "prestazioni pensionistiche"); il modulo regionale del contributo carburante non è un libretto né un affitto ("locazione finanziaria"); "prima immatricolazione" riconosce un libretto letto male dall'OCR; "dichiarazione 730" riconosce la ricevuta del 730.
+- **Valori confrontati con le DSU vere** presentate al CAF (nelle stesse cartelle): saldi e giacenze dei conti uguali all'euro. Corretti: il separatore delle migliaia come carattere di controllo in alcuni estratti conto (`TesseractOcrEngine::senzaControllo`, prima si leggeva il "saldo del periodo"); l'IBAN di un bonifico ("A Fav: … IBAN") non sostituisce più quello del conto (`TestoVoci::iban(…, true)`, anche per gli IBAN da completare); un importo facoltativo con etichette che il documento non nomina proprio si scarta (la giacenza ricopiata dal saldo); conti a zero (`zero: true`).
+- **Polizze vita: i premi versati.** Le istruzioni DSU vogliono i premi versati in tutto fino al 31 dicembre, meno i riscatti, non il valore del capitale: il CAF dichiara i "versamenti totali", non il valore del capitale che l'app proponeva prima. Le etichette dei versamenti vengono prima di quelle del valore.
+- Conti cointestati: nella DSU il CAF divide saldo e giacenza tra gli intestatari del nucleo; l'app propone il conto una volta, con il valore intero (il totale non cambia).
+- Modelli ISEE provvisori 2020–2023 (copie del 2024, da verificare) per provare le annate vecchie.
+- `app:pratiche:prova-cartella --mostra=<parola>` stampa il testo letto dai file che la contengono nel percorso.
 
 ### Dove cercare: categorie, etichette, analizza tutti (13/11/2026)
 

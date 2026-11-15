@@ -57,7 +57,7 @@ final class ValoriVoce
         }
 
         return match ($campo->tipo) {
-            'importo' => null === ($c = self::centesimi($valore)) ? throw new DatiNonValidi(sprintf('%s: importo non valido, usa il formato 123.45.', $campo->etichetta)) : self::formatta($c),
+            'importo' => null === ($c = self::centesimi($valore, $campo->zero)) ? throw new DatiNonValidi(sprintf('%s: importo non valido, usa il formato 123.45.', $campo->etichetta)) : self::formatta($c),
             'data' => self::data($valore, $campo->etichetta),
             'scelta' => \is_string($valore) && null !== $requisito->tipo($valore) ? $valore : throw new DatiNonValidi(sprintf('%s: scegli uno dei valori proposti.', $campo->etichetta)),
             'tracciabile' => \is_string($valore) && \in_array($valore, Campo::TRACCIABILE, true) ? $valore : throw new DatiNonValidi(sprintf('%s: vale "si", "no" o "non_risulta".', $campo->etichetta)),
@@ -68,7 +68,7 @@ final class ValoriVoce
     }
 
     /** "1.234,56", "1234,56", "1234.56", 12 → centesimi; null se non valido o non positivo. */
-    public static function centesimi(mixed $valore): ?int
+    public static function centesimi(mixed $valore, bool $zero = false): ?int
     {
         if (\is_int($valore) || \is_float($valore)) {
             $valore = (string) $valore;
@@ -87,7 +87,7 @@ final class ValoriVoce
         }
         $c = (int) round((float) $t * 100);
 
-        return $c > 0 && $c <= self::MAX_CENTESIMI ? $c : null;
+        return ($zero ? $c >= 0 : $c > 0) && $c <= self::MAX_CENTESIMI ? $c : null;
     }
 
     public static function formatta(int $centesimi): string

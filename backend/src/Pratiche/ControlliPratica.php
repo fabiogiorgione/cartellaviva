@@ -62,8 +62,8 @@ final class ControlliPratica
         }
         // Confronto con un altro valore (es. il saldo della DSU precompilata con quello del documento).
         foreach ($r->campi as $c) {
-            $mio = ValoriVoce::centesimi($valori[$c->confronta ?? ''] ?? null);
-            $altro = ValoriVoce::centesimi($valori[$c->codice] ?? null);
+            $mio = ValoriVoce::centesimi($valori[$c->confronta ?? ''] ?? null, true);
+            $altro = ValoriVoce::centesimi($valori[$c->codice] ?? null, true);
             if (null !== $c->confronta && null !== $mio && null !== $altro && $mio !== $altro) {
                 $out[] = ['codice' => 'confronto', 'livello' => 'avviso', 'testo' => sprintf(
                     '%s: %s € contro %s € del documento. Controlla quale è giusto prima di firmare.',

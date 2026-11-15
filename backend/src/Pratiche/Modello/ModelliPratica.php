@@ -147,6 +147,7 @@ class ModelliPratica
                     true === ($c['soloUtente'] ?? false),
                     true === ($c['ultimo'] ?? false),
                     true === ($c['serve'] ?? false),
+                    true === ($c['zero'] ?? false),
                 );
             }
             if ([] === $campi) {

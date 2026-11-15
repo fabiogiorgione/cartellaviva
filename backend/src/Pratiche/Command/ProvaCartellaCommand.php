@@ -49,7 +49,8 @@ final class ProvaCartellaCommand extends Command
             ->addOption('attesi', null, InputOption::VALUE_REQUIRED, 'File JSON {"percorso/file.pdf": "requisito" | "nessuno"} con il risultato giusto')
             ->addOption('tutti', null, InputOption::VALUE_NONE, 'Come "analizza tutti" della pratica: anche i documenti senza parole chiave vanno all\'AI, con tutti i requisiti')
             ->addOption('ai', null, InputOption::VALUE_NONE, 'Chiede anche le voci al modello (lento: da secondi a un minuto per documento)')
-            ->addOption('json', null, InputOption::VALUE_REQUIRED, 'Scrive anche il risultato in questo file JSON');
+            ->addOption('json', null, InputOption::VALUE_REQUIRED, 'Scrive anche il risultato in questo file JSON')
+            ->addOption('mostra', null, InputOption::VALUE_REQUIRED, 'Stampa il testo letto dai file il cui percorso contiene questa parola (per capire perché un file si perde)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -87,6 +88,10 @@ final class ProvaCartellaCommand extends Command
                 $riga['errore'] = mb_substr($e->getMessage(), 0, 80);
             }
             $riga['caratteri'] = mb_strlen(trim($testo));
+            if (null !== $input->getOption('mostra') && str_contains(mb_strtolower($relativo), mb_strtolower((string) $input->getOption('mostra')))) {
+                $io->section($relativo);
+                $io->writeln($testo);
+            }
             $nome = basename($percorso);
             $riga['candidati'] = array_map(static fn ($r) => $r->codice, EstrattoreVoci::candidati($modello, null, $testo, $nome, false, $tutti));
             if ($conAi && [] !== $riga['candidati']) {

@@ -38,7 +38,7 @@ final class TesseractOcrEngine implements OcrEngineInterface
 
     private function pdf(string $pdf): string
     {
-        $textLayer = trim(str_replace("\f", "\n", $this->run(['pdftotext', '-layout', '-', '-'], $pdf, 'lettura testo PDF')));
+        $textLayer = self::senzaControllo(trim(str_replace("\f", "\n", $this->run(['pdftotext', '-layout', '-', '-'], $pdf, 'lettura testo PDF'))));
         if (mb_strlen(preg_replace('/\s+/', '', $textLayer) ?? '') >= self::MIN_TEXT_LAYER_CHARS) {
             return $textLayer;
         }
@@ -52,6 +52,18 @@ final class TesseractOcrEngine implements OcrEngineInterface
         }
 
         return trim(implode("\n\n", $texts));
+    }
+
+    /**
+     * Alcuni PDF (alcuni estratti conto) usano un carattere di controllo
+     * come separatore delle migliaia: "1\x19834,56" diventa "1.834,56". Gli altri
+     * caratteri di controllo (tranne a capo e tabulazione) si tolgono.
+     */
+    public static function senzaControllo(string $testo): string
+    {
+        $testo = (string) preg_replace('/(?<=\d)[\x00-\x08\x0B\x0E-\x1F](?=\d{3}(?!\d))/', '.', $testo);
+
+        return (string) preg_replace('/[\x00-\x08\x0B\x0E-\x1F\x7F]/', '', $testo);
     }
 
     /**

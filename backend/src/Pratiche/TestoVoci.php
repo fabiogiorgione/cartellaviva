@@ -65,6 +65,50 @@ final class TestoVoci
         return array_values(array_unique($date));
     }
 
+    /**
+     * Anni a cui il documento dice di riferirsi: "relativa all'anno 2022" (CU),
+     * "730/2023 Redditi 2022", "anno d'imposta 2022", "anno riferimento 2022",
+     * "riferita all'anno 2022" (giacenza media), "al 31.12.2022" (estratti
+     * conto, saldi). Vuoto se il testo non lo dice in nessuno di questi modi.
+     *
+     * @return list<int>
+     */
+    public static function anniDichiarati(string $testo): array
+    {
+        $basso = Requisito::normale($testo);
+        $anni = [];
+        foreach ([
+            "~(?:relativ[ao]|riferit[ao]|riferiment[oi])\s+all\s*'\s*anno\s+(\d{4})(?!\d)~u",
+            "~anno\s+(?:di\s+)?riferimento\s*:?\s*(\d{4})(?!\d)~u",
+            "~anno\s+d\s*(?:'|i)\s*imposta\s*:?\s*(\d{4})(?!\d)~u",
+            '~730\s*/\s*\d{4}\s+redditi\s+(\d{4})(?!\d)~u',
+            // "TFR maturato fino al 31/12/2000" nella CU non è l'anno del documento.
+            '~(?<!fino )\bal\s+31\s*[./\-]\s*12\s*[./\-]\s*(\d{4}|\d{2})(?!\d)~u',
+        ] as $regola) {
+            if (preg_match_all($regola, $basso, $m)) {
+                foreach ($m[1] as $a) {
+                    $anno = 2 === \strlen($a) ? 2000 + (int) $a : (int) $a;
+                    if ($anno >= 1990 && $anno <= 2100) {
+                        $anni[$anno] = true;
+                    }
+                }
+            }
+        }
+
+        return array_keys($anni);
+    }
+
+    /**
+     * Il documento dichiara di riferirsi ad anni diversi da quello indicato
+     * (la CU o il 730 dell'anno prima)? Se non dice niente, no.
+     */
+    public static function altroAnno(string $testo, int $anno): bool
+    {
+        $anni = self::anniDichiarati($testo);
+
+        return [] !== $anni && !\in_array($anno, $anni, true);
+    }
+
     /** Prima data del testo nell'anno indicato. */
     public static function dataNellAnno(string $testo, int $anno): ?string
     {
@@ -106,11 +150,13 @@ final class TestoVoci
      * delle righe sotto (tabelle con l'intestazione "GIACENZA MEDIA"). In centesimi,
      * nell'ordine del testo.
      *
+     * Con $zero valgono anche gli importi a zero (il saldo di un conto vuoto).
+     *
      * @param list<string> $etichette minuscole
      *
      * @return list<int>
      */
-    public static function importiVicini(string $testo, array $etichette): array
+    public static function importiVicini(string $testo, array $etichette, bool $zero = false): array
     {
         $basso = mb_strtolower($testo);
         $righe = explode("\n", $basso);
@@ -155,7 +201,7 @@ final class TestoVoci
             }
             ksort($trovati);
             // Prima quelli sulla stessa riga dell'etichetta, poi quelli in colonna.
-            $centesimi = array_values(array_filter(array_map(static fn (string $v) => ValoriVoce::centesimi($v), [...array_values($sullaRiga), ...array_values($trovati)]), static fn ($c) => null !== $c));
+            $centesimi = array_values(array_filter(array_map(static fn (string $v) => ValoriVoce::centesimi($v, $zero), [...array_values($sullaRiga), ...array_values($trovati)]), static fn ($c) => null !== $c));
             if ([] !== $centesimi) {
                 return $centesimi;
             }
@@ -164,16 +210,26 @@ final class TestoVoci
         return [];
     }
 
-    /** IBAN italiani validi (controllo mod 97) nel testo, anche scritti a gruppi. @return list<string> */
-    public static function iban(string $testo): array
+    /**
+     * IBAN italiani validi (controllo mod 97) nel testo, anche scritti a gruppi.
+     * Con $senzaControparti si saltano quelli dei movimenti (beneficiario, ordinante).
+     *
+     * @return list<string>
+     */
+    public static function iban(string $testo, bool $senzaControparti = false): array
     {
-        preg_match_all('~\bIT\s?\d{2}\s?[A-Z](?:\s?\d){10}(?:\s?[0-9A-Z]){12}\b~i', $testo, $m);
+        preg_match_all('~\bIT\s?\d{2}\s?[A-Z](?:\s?\d){10}(?:\s?[0-9A-Z]){12}\b~i', $testo, $m, \PREG_OFFSET_CAPTURE);
         $out = [];
-        foreach ($m[0] as $grezzo) {
+        foreach ($m[0] as [$grezzo, $pos]) {
             $iban = strtoupper((string) preg_replace('/\s+/', '', $grezzo));
-            if (self::ibanValido($iban)) {
-                $out[] = $iban;
+            if (!self::ibanValido($iban)) {
+                continue;
             }
+            // Nei movimenti di un estratto conto ("A Fav: ROSSI IBAN: IT..."), l'IBAN è dell'altro.
+            if ($senzaControparti && 1 === preg_match('~(?:\ba\s+fav|\bfavore|\bord\s*:|ordinante|beneficiario|bonifico)[^\n]{0,60}\n?[^\n]{0,60}$~iu', substr($testo, max(0, $pos - 130), min(130, $pos)))) {
+                continue;
+            }
+            $out[] = $iban;
         }
 
         return array_values(array_unique($out));
