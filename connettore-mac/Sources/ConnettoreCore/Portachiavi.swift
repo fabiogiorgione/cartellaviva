@@ -37,3 +37,18 @@ public enum Portachiavi {
         SecItemDelete(q as CFDictionary)
     }
 }
+
+/// Dove il connettore tiene il refresh token: il Portachiavi, o un deposito in memoria nei test.
+public protocol DepositoToken: Sendable {
+    func leggi(per server: URL) -> String?
+    func salva(_ valore: String, per server: URL)
+    func elimina(per server: URL)
+}
+
+/// Il deposito vero: il Portachiavi di questo Mac.
+public struct DepositoPortachiavi: DepositoToken {
+    public init() {}
+    public func leggi(per server: URL) -> String? { Portachiavi.leggi(per: server) }
+    public func salva(_ valore: String, per server: URL) { Portachiavi.salva(valore, per: server) }
+    public func elimina(per server: URL) { Portachiavi.elimina(per: server) }
+}

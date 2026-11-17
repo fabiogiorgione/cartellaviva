@@ -31,6 +31,7 @@ parameters:
     app.connettore_ai.sperimentali_ammessi: false
     app.connettore_ai.attesa_massima: 600
     app.connettore_device_limit: 5
+    app.connettore_password_limit: 5
 
 services:
     _defaults:
@@ -59,6 +60,7 @@ when@test:
         app.public_auth_limit: 1000
         app.proposta_categoria_limit: 4
         app.connettore_device_limit: 1000
+        app.connettore_password_limit: 1000
         # FakeEmbedder (parole in comune) ha distanze più alte di bge-m3; senza parole in comune vale 1.
         app.ricerca_distanza_max: 0.9
 

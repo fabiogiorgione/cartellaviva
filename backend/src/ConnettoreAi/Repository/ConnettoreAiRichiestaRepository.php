@@ -4,6 +4,8 @@ namespace App\ConnettoreAi\Repository;
 
 use App\ConnettoreAi\Entity\ConnettoreAiRichiesta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /** @extends ServiceEntityRepository<ConnettoreAiRichiesta> */
@@ -14,9 +16,15 @@ class ConnettoreAiRichiestaRepository extends ServiceEntityRepository
         parent::__construct($registry, ConnettoreAiRichiesta::class);
     }
 
-    public function perDeviceCode(string $hash): ?ConnettoreAiRichiesta
+    /** Con un blocco in scrittura (dentro una transazione): uno scambio alla volta per codice. */
+    public function perDeviceCodeBloccata(string $hash): ?ConnettoreAiRichiesta
     {
-        return $this->findOneBy(['deviceCodeHash' => $hash]);
+        return $this->createQueryBuilder('r')
+            ->andWhere('r.deviceCodeHash = :h')->setParameter('h', $hash)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
     }
 
     /** La richiesta viva (in attesa, non scaduta) con quel codice. */

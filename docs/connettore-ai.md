@@ -138,9 +138,9 @@ ai_connector:
 **Flusso:**
 
 1. `POST /api/ai-connector-plugin/oauth/device` (form o JSON) `{client_id: "cartellaviva-mac", nome: "MacBook di Mario"}` → `{device_code, user_code, verification_uri: "https://<dominio>/collega-mac", verification_uri_complete: "https://<dominio>/collega-mac?codice=WDJB-MJHT", expires_in: 600, interval: 5}`. Limite: 5 richieste all'ora per IP (`rate_limiter.yaml`, nuovo `connettore_device`).
-2. Nell'app, l'admin apre il link o scrive il codice e approva: `POST /api/tenants/{tenantId}/connettori-ai/approva` `{userCode, nome?, codice2fa?}` sul firewall `api`. Serve `connettore_ai:manage`; se l'utente ha la 2FA attiva serve anche un codice valido (stessa verifica del login). `POST .../connettori-ai/nega` `{userCode}` rifiuta. Entrambi in `AuditLogger`.
-3. Il connettore interroga `POST /api/ai-connector-plugin/oauth/token` con `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code`, `client_id`. Risposte d'errore come da RFC (`400` con `error`): `authorization_pending`, `slow_down` (se interroga prima di `interval`), `access_denied`, `expired_token`. Al successo la richiesta passa a `usata`, nasce il `connettore_ai` e la risposta è `{access_token, token_type: "Bearer", expires_in: 3600, refresh_token, scope: "ai-connector"}`.
-4. Rinnovo: stesso endpoint con `grant_type=refresh_token`. Il refresh token si consuma e se ne emette uno nuovo con la stessa scadenza; un refresh token già usato revoca il connettore (possibile furto).
+2. Nell'app, l'admin apre il link o scrive il codice e approva: `POST /api/tenants/{tenantId}/connettori-ai/approva` `{userCode, nome?, codice2fa?, password?}` sul firewall `api`. Serve `connettore_ai:manage` e sempre una conferma, perché il Mac riceverà il testo dei documenti: con la 2FA attiva un codice valido (stessa verifica del login); senza 2FA la password dell'account (403 se manca, 422 se sbagliata, con audit `connettore_ai.approvato` esito `FAILURE` e il limite `connettore_password`: 5 password sbagliate ogni 15 minuti per utente); chi non ha né 2FA né password (accesso solo con Google) riceve 409 e deve prima attivare una delle due. L'app mostra sopra i pulsanti un avviso: approvare solo se il codice è sullo schermo di un Mac proprio, davanti a sé. `POST .../connettori-ai/nega` `{userCode}` rifiuta. Entrambi in `AuditLogger`.
+3. Il connettore interroga `POST /api/ai-connector-plugin/oauth/token` con `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code`, `client_id`. Risposte d'errore come da RFC (`400` con `error`): `authorization_pending`, `slow_down` (se interroga prima di `interval`), `access_denied`, `expired_token`. Al successo la richiesta passa a `usata`, nasce il `connettore_ai` e la risposta è `{access_token, token_type: "Bearer", expires_in: 3600, refresh_token, scope: "ai-connector"}`. La richiesta si legge con un blocco in scrittura (`SELECT … FOR UPDATE`, in transazione): due scambi insieme dello stesso codice creano un solo connettore. A chi ha approvato arriva un'email con il nome del Mac, data e ora e dove scollegarlo (Sicurezza e accesso → AI sul tuo Mac).
+4. Rinnovo: stesso endpoint con `grant_type=refresh_token`. Il refresh token si consuma e se ne emette uno nuovo con la stessa scadenza. Il refresh token di prima vale ancora per 60 secondi dalla rotazione (`ConnettoreAi::TOLLERANZA_SECONDI`), se la risposta non è arrivata al Mac: dà una nuova coppia di token, i token emessi alla rotazione non valgono più e la finestra non si allunga (la rotazione si ricava da `access_scade_il` meno `ACCESSO_SECONDI`, senza colonne in più). Dopo i 60 secondi un refresh token già usato revoca il connettore (possibile furto; audit `connettore_ai.scollegato`, motivo `refresh_riusato`). Un rinnovo alla volta per connettore (blocco in scrittura). Il prezzo della tolleranza: chi avesse copiato il refresh token e lo usasse entro 60 secondi dalla rotazione otterrebbe token validi; il Mac vero a quel punto viene scollegato al rinnovo successivo, e il proprietario lo vede.
 5. Revoca dall'app: `DELETE /api/tenants/{tenantId}/connettori-ai/{id}`. Effetto immediato: token non validi, lavori assegnati rimessi in attesa.
 
 Tutti i token sono `TokenCasuale::nuovo()`; a database solo l'hash sha256.
@@ -188,7 +188,7 @@ Risposta: `{famiglia: {nome}, intervalloSecondi: 20, caratteriMax: 12000, modell
 
 Le istruzioni, il prompt e lo schema si costruiscono come in `PraticheService::lavoriTelefono` (estrarre la parte comune in un metodo, per esempio `PraticheService::lavoroPerDocumento`). `caratteri` lo calcola il connettore dal contesto, con la formula dell'iPhone: (contesto − 1500) × 3, tra 1.500 e 12.000. Se il documento non è più da guardare (`CandidatiPratica::daGuardare`), il lavoro si cancella e non si restituisce. Nessun lavoro: `{lavori: [], restano: 0}`.
 
-**`POST /lavori/{id}/proroga`**: allunga il lease di 5 minuti (il connettore la chiama ogni 2 minuti durante un'analisi lunga). 409 se il lavoro non è più suo.
+**`POST /lavori/{id}/proroga`**: allunga il lease di 5 minuti (il connettore la chiama ogni 60 secondi durante un'analisi lunga: così resta anche online, perché dopo 90 secondi senza contatti il server lo considera spento). 409 se il lavoro non è più suo.
 
 **`POST /lavori/{id}/risultato`**:
 
@@ -205,7 +205,7 @@ Le istruzioni, il prompt e lo schema si costruiscono come in `PraticheService::l
 
 Il server fa ciò che fa `risultatoTelefono` (estrarre la parte comune), con origine `ai_connettore`, registra `pratica_analisi` con `metodo`, `modello`, `durata_ms` e `connettore_ai_id`, aggiorna `lavori_fatti` e `durata_media_ms`, cancella il lavoro. Risposta `{voci: n}`. 409 se il lavoro non è del connettore, se il lease è scaduto o se il documento è già stato analizzato. Corpo massimo 64 KB.
 
-Se `modello` non è tra i verificati e `sperimentaliAmmessi` è falso, il server rifiuta con 409: il connettore non deve usare quel modello per i lavori.
+Se `modello` non è tra i verificati e `sperimentaliAmmessi` è falso, il server rifiuta con 409: il connettore non deve usare quel modello per i lavori. Il nome del modello (e il digest) li dichiara il connettore: è una dichiarazione, non una prova, e un connettore modificato può dichiarare quello che vuole. La garanzia vera resta il ricontrollo dei valori sul testo del documento fatto dal server (`EstrattoreVoci`): un valore che il testo non contiene si scarta, qualunque modello l'abbia proposto.
 
 **`POST /lavori/{id}/errore`** `{codice: "modello_mancante" | "timeout" | "memoria" | "risposta_non_valida" | "interrotto"}`: il lavoro torna in attesa con `tentativi + 1`; dal secondo errore va al server. Al server arriva solo il codice, mai un messaggio con testo del documento (come per l'iPhone).
 
@@ -274,7 +274,8 @@ Nuova cartella `connettore-mac/` nel repo: progetto Xcode, SwiftUI, licenza AGPL
 
 - `think: false` solo se il modello lo supporta (`POST /api/show`, `capabilities` contiene `thinking`): è il caso di qwen3 8B, che senza questa opzione ragiona prima di rispondere ed è circa 10 volte più lento.
 - Durata, `prompt_eval_count` ed `eval_count` dalla risposta di Ollama finiscono nel risultato.
-- `proroga` ogni 2 minuti; timeout del lavoro 4 minuti, poi `errore: timeout`.
+- `proroga` ogni 60 secondi; timeout del lavoro 4 minuti, poi `errore: timeout`;
+- il ciclo si ferma solo se il server rifiuta il refresh token (`invalid_grant` e simili: il Mac si scollega). Rete assente o server che non risponde lasciano il refresh token nel Portachiavi: si mostra l'errore e si riprova dopo l'intervallo (un rinnovo fallito per la rete si riprova una volta dopo 3 secondi). Un rinnovo alla volta. Al risveglio del Mac (`NSWorkspace.didWakeNotification`) un giro subito.
 - Durante un lavoro: `ProcessInfo.beginActivity` per evitare App Nap e la sospensione per inattività; nessuna attività tra un lavoro e l'altro.
 - Batteria: con il Mac a batteria sotto il 20%, il connettore smette di chiedere lavori (impostazione predefinita, modificabile).
 
@@ -301,7 +302,8 @@ Nuova cartella `connettore-mac/` nel repo: progetto Xcode, SwiftUI, licenza AGPL
 - [ ] Nessun testo, prompt o risposta in `lavoro_ai`, nei log del server o nell'audit.
 - [ ] Valori del modello non presenti nel testo scartati dal server (`EstrattoreVoci`), come per l'iPhone.
 - [ ] Cifrati al connettore solo con `consenso_cifrati_dispositivi_il`.
-- [ ] Refresh token riusato = connettore revocato.
+- [ ] Refresh token riusato dopo 60 secondi dalla rotazione = connettore revocato; entro 60 secondi nuovi token.
+- [ ] Approvazione sempre con conferma (codice 2FA o password); email a chi ha approvato quando il Mac si collega.
 - [ ] Chi ha approvato perde il permesso = connettore revocato alla richiesta successiva.
 - [ ] Limiti di frequenza su `oauth/device`, `oauth/token` (`slow_down`) e `lavori`.
 - [ ] Le attività di sicurezza della produzione (segreti ruotati, token di accesso al repository revocati, accesso SSH limitato, superadmin con 2FA, master key esportata, backup fuori dal server, DMARC) chiuse **prima** di attivare il connettore in produzione.
@@ -341,6 +343,8 @@ PHPStan pulito, come oggi.
 
 **Fase 0, misura.** Stessa richiesta dell'app (estratto conto finto, ~1.150 token di prompt, qwen3 4B Q4_K_M, contesto 8.192, prompt diverso a ogni giro per non usare la cache): Mac M3 16 GB con Ollama nativo 7,4 s a documento, VM D2s 66 s; lettura del prompt ~470 contro 27 token/s, scrittura 26 contro 5,5. Sul banco ISEE 2026 il Mac fa 22 documenti all'AI in circa 4 minuti.
 
+**Correzioni dopo la revisione del 16/11/2026.** Approvazione con conferma obbligatoria ed email al collegamento; tolleranza di 60 secondi sul refresh token; scambio e rinnovo con blocco in scrittura; proroga del Mac ogni 60 secondi; ciclo del Mac che non si ferma per un errore di rete; il modello "verificato" descritto come dichiarazione del connettore.
+
 **Fase 1, backend.** Modulo `backend/src/ConnettoreAi/`, migrazione `Version20261115100000`, test `ConnettoreAiTest` (7 test: abbinamento, 2FA, firewall separati, refresh a uso singolo, instradamento e risultato, lease ed errori, ritorno al server, revoca, consenso dei cifrati per i dispositivi). Scelte rispetto alla specifica:
 
 - il riuso di un refresh token si riconosce dall'ultimo consumato (`refresh_precedente_hash`), senza una tabella in più;
@@ -351,7 +355,7 @@ PHPStan pulito, come oggi.
 
 **Fase 2, app.** `lib/features/connettore_ai/`: scheda "AI sul tuo Mac" in Sicurezza e accesso (solo con `connettore_ai:manage`: elenco con stato, chip, modello, tempo medio, documenti analizzati; Rinomina, Scollega con conferma; "Collega un Mac"), rotta `/collega-mac?codice=…` (cerca la richiesta, nome modificabile, codice 2FA se attiva, Approva o Rifiuta), voci "Letta sul Mac" e "Letta sull'iPhone" nella pratica, e nel consenso per i cifrati la spunta "Anche ai dispositivi collegati della famiglia". Provata sul simulatore con il connettore simulato.
 
-**Fase 3, connettore macOS (prima versione).** Cartella `connettore-mac/` ([README](../connettore-mac/README.md)): pacchetto Swift al posto del progetto Xcode (niente identificativo del team nel repository), `scripts/crea-app.sh` per la `.app` (LSUIElement, hardened runtime, firma ad hoc o Developer ID). App nella barra dei menu con finestra di configurazione: server, Ollama, modello (scarica e prova), collegamento con codice grande e QR, avvio al login, pausa con batteria sotto il 20%; ciclo dei lavori con `PUT /me` ogni 60 secondi, proroga ogni 2 minuti, timeout 4 minuti, `beginActivity`, `think: false` per i modelli che ragionano; refresh token nel Portachiavi. Provata sul Mac M3 contro il server di sviluppo: collegamento approvato, documenti analizzati in circa 8 secondi l'uno. Mancano: Sparkle, icona, DMG e notarizzazione (serve Developer ID), test su più Mac.
+**Fase 3, connettore macOS (prima versione).** Cartella `connettore-mac/` ([README](../connettore-mac/README.md)): pacchetto Swift al posto del progetto Xcode (niente identificativo del team nel repository), `scripts/crea-app.sh` per la `.app` (LSUIElement, hardened runtime, firma ad hoc o Developer ID). App nella barra dei menu con finestra di configurazione: server, Ollama, modello (scarica e prova), collegamento con codice grande e QR, avvio al login, pausa con batteria sotto il 20%; ciclo dei lavori con `PUT /me` ogni 60 secondi, proroga ogni 60 secondi (era 2 minuti: oltre i 90 secondi di `ONLINE_SECONDI`), timeout 4 minuti, `beginActivity`, `think: false` per i modelli che ragionano; refresh token nel Portachiavi. Provata sul Mac M3 contro il server di sviluppo: collegamento approvato, documenti analizzati in circa 8 secondi l'uno. Mancano: Sparkle, icona, DMG e notarizzazione (serve Developer ID), test su più Mac.
 
 ## Da decidere
 

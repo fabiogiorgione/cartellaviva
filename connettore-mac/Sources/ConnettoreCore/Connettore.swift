@@ -35,6 +35,15 @@ public enum Stato: Equatable, Sendable {
 public final class Connettore: ObservableObject {
     public static let versione = "0.1.0"
     public static let modelloConsigliato = "qwen3:4b-instruct-2507-q4_K_M"
+    /// Ogni quanto si proroga un lavoro in corso. Il server considera spento un Mac
+    /// che tace da 90 secondi (ConnettoreAi::ONLINE_SECONDI) e il lavoro scade dopo 300.
+    public static let prorogaSecondi: TimeInterval = 60
+    /// Attesa prima di riprovare un rinnovo finito con un errore di rete.
+    static let riprovaRinnovoSecondi: TimeInterval = 3
+    /// L'attesa vera; nei test se ne passa una più corta.
+    public static let dorme: @Sendable (TimeInterval) async -> Void = { secondi in
+        try? await Task.sleep(nanoseconds: UInt64(max(secondi, 0) * 1_000_000_000))
+    }
     static let log = Logger(subsystem: "it.cartellaviva.connettore", category: "lavori")
 
     @Published public private(set) var stato: Stato = .scollegato
@@ -44,29 +53,41 @@ public final class Connettore: ObservableObject {
     @Published public private(set) var modelliVerificati: [String] = [modelloConsigliato]
     @Published public var pausaConBatteria = true
 
-    public var server: URL { didSet { UserDefaults.standard.set(server.absoluteString, forKey: "server") } }
-    public var modello: String { didSet { UserDefaults.standard.set(modello, forKey: "modello") } }
+    public var server: URL { didSet { impostazioni.set(server.absoluteString, forKey: "server") } }
+    public var modello: String { didSet { impostazioni.set(modello, forKey: "modello") } }
     public let contesto = 8192
     public let ollama: OllamaClient
+    let sessione: URLSession
+    let deposito: any DepositoToken
+    let impostazioni: UserDefaults
+    let attendi: @Sendable (TimeInterval) async -> Void
 
     private var token: String?
     private var tokenScadeIl = Date.distantPast
     private var ciclo: Task<Void, Never>?
     private var pausaFino: Date?
     private var giornoContato = Calendar.current.startOfDay(for: Date())
+    private var attesa: Task<Void, Never>?
+    private var rinnovoInCorso: Task<Void, Error>?
 
-    public init(ollama: OllamaClient = OllamaClient()) {
+    public init(ollama: OllamaClient = OllamaClient(), sessione: URLSession = .shared, deposito: any DepositoToken = DepositoPortachiavi(), impostazioni: UserDefaults = .standard, attendi: @escaping @Sendable (TimeInterval) async -> Void = Connettore.dorme) {
         self.ollama = ollama
-        let d = UserDefaults.standard
-        server = d.string(forKey: "server").flatMap(URL.init(string:)) ?? URL(string: "https://app.cartellaviva.it")!
-        modello = d.string(forKey: "modello") ?? Self.modelloConsigliato
+        self.sessione = sessione
+        self.deposito = deposito
+        self.impostazioni = impostazioni
+        self.attendi = attendi
+        server = impostazioni.string(forKey: "server").flatMap(URL.init(string:)) ?? URL(string: "https://app.cartellaviva.it")!
+        modello = impostazioni.string(forKey: "modello") ?? Self.modelloConsigliato
     }
 
-    var client: ServerClient { ServerClient(base: server) }
+    var client: ServerClient { ServerClient(base: server, sessione: sessione) }
+
+    /// C'è un collegamento salvato su questo Mac?
+    public var collegato: Bool { deposito.leggi(per: server) != nil }
 
     /// All'avvio: se c'è un collegamento salvato, si riparte da lì.
     public func avvia() {
-        guard Portachiavi.leggi(per: server) != nil else {
+        guard collegato else {
             stato = .scollegato
             return
         }
@@ -116,7 +137,7 @@ public final class Connettore: ObservableObject {
     /// Dimentica il collegamento su questo Mac (per scollegarlo dalla famiglia, usare l'app).
     public func scollega() {
         ciclo?.cancel()
-        Portachiavi.elimina(per: server)
+        deposito.elimina(per: server)
         token = nil
         famiglia = nil
         stato = .scollegato
@@ -134,12 +155,15 @@ public final class Connettore: ObservableObject {
 
     // MARK: Ciclo dei lavori
 
+    /// Il ciclo finisce solo se viene annullato o se il server rifiuta il collegamento.
+    /// Ogni altro errore (rete, server, Ollama) si mostra e si riprova dopo l'intervallo.
     private func avviaCiclo() {
         ciclo?.cancel()
         stato = .pronto
         ciclo = Task { [weak self] in
             var ultimaPresentazione = Date.distantPast
             var intervallo: TimeInterval = 20
+            var rifiutatoPrima = false
             while !Task.isCancelled {
                 guard let self else { return }
                 do {
@@ -149,22 +173,42 @@ public final class Connettore: ObservableObject {
                         ultimaPresentazione = Date()
                     }
                     let lavorato = try await self.passo()
+                    rifiutatoPrima = false
                     if lavorato { continue }
+                } catch ErroreServer.scollegato {
+                    return
                 } catch ErroreServer.nonAutorizzato {
-                    if !(await self.rinnova()) { return }
-                    continue
+                    // Il token di accesso non vale più: al giro dopo si rinnova.
+                    // Subito la prima volta, poi solo dopo l'intervallo.
+                    self.dimenticaAccesso()
+                    if !rifiutatoPrima {
+                        rifiutatoPrima = true
+                        continue
+                    }
+                    self.stato = .errore(ErroreServer.nonAutorizzato.localizedDescription)
                 } catch ErroreServer.troppoPresto {
                     // Il server vuole al massimo una richiesta ogni 5 secondi.
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    await self.aspetta(5)
                     continue
-                } catch let e as ErroreServer {
-                    self.stato = .errore(e.localizedDescription)
                 } catch {
                     self.stato = .errore(error.localizedDescription)
                 }
-                try? await Task.sleep(nanoseconds: UInt64(intervallo * 1_000_000_000))
+                await self.aspetta(intervallo)
             }
         }
+    }
+
+    /// Un'attesa del ciclo, che il risveglio del Mac interrompe.
+    private func aspetta(_ secondi: TimeInterval) async {
+        let t = Task { [attendi] in await attendi(secondi) }
+        attesa = t
+        await withTaskCancellationHandler { await t.value } onCancel: { t.cancel() }
+        attesa = nil
+    }
+
+    /// Il Mac si è appena svegliato: niente attesa, si fa subito un giro.
+    public func risvegliato() {
+        attesa?.cancel()
     }
 
     private func presentati() async throws -> Impostazioni {
@@ -206,10 +250,10 @@ public final class Connettore: ObservableObject {
         let attivita = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "Analisi di un documento di CartellaViva")
         defer { ProcessInfo.processInfo.endActivity(attivita) }
         let inizio = Date()
-        let proroga = Task { [client, weak self] in
+        let proroga = Task { [client, attendi, weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 120 * 1_000_000_000)
-                guard !Task.isCancelled, let t = self?.token else { return }
+                await attendi(Self.prorogaSecondi)
+                guard !Task.isCancelled, let self, let t = try? await self.tokenValido() else { return }
                 try? await client.proroga(lavoro.id, token: t)
             }
         }
@@ -251,33 +295,59 @@ public final class Connettore: ObservableObject {
 
     private func tokenValido() async throws -> String {
         if let token, tokenScadeIl > Date().addingTimeInterval(60) { return token }
-        guard await rinnova(), let token else { throw ErroreServer.nonAutorizzato }
+        try await rinnova()
+        guard let token else { throw ErroreServer.scollegato }
         return token
     }
 
-    /// Rinnovo con il refresh token del Portachiavi; se non vale più, il Mac è scollegato.
-    private func rinnova() async -> Bool {
-        guard let refresh = Portachiavi.leggi(per: server) else {
+    private func dimenticaAccesso() {
+        token = nil
+        tokenScadeIl = .distantPast
+    }
+
+    /// Un rinnovo alla volta: il refresh token vale una volta sola, e due rinnovi
+    /// insieme (il ciclo e la proroga) si contenderebbero la stessa coppia di token.
+    private func rinnova() async throws {
+        if let r = rinnovoInCorso { return try await r.value }
+        let r = Task { try await self.rinnovaOra() }
+        rinnovoInCorso = r
+        defer { rinnovoInCorso = nil }
+        try await r.value
+    }
+
+    /// Rinnovo con il refresh token salvato.
+    /// - Il server rifiuta il collegamento (ErroreOAuth): il Mac si scollega, ErroreServer.scollegato.
+    /// - Rete o server che non rispondono: il refresh token resta dov'è, si riprova
+    ///   una volta dopo qualche secondo e poi si lascia l'errore al ciclo.
+    private func rinnovaOra() async throws {
+        guard let refresh = deposito.leggi(per: server) else {
             scollega()
-            return false
+            throw ErroreServer.scollegato
         }
-        do {
-            salva(try await client.rinnova(refreshToken: refresh))
-            return true
-        } catch is ErroreOAuth {
-            scollega()
-            stato = .errore("Il Mac è stato scollegato dall'app: collegalo di nuovo.")
-            return false
-        } catch {
-            stato = .errore(error.localizedDescription)
-            return false
+        var tentativi = 0
+        while true {
+            do {
+                salva(try await client.rinnova(refreshToken: refresh))
+                return
+            } catch is ErroreOAuth {
+                scollega()
+                stato = .errore(ErroreServer.scollegato.localizedDescription)
+                throw ErroreServer.scollegato
+            } catch {
+                tentativi += 1
+                let e = error as? ErroreServer ?? .rete(error.localizedDescription)
+                if tentativi >= 2 || Task.isCancelled { throw e }
+                // Se la risposta si è persa dopo la rotazione, il server accetta
+                // ancora per 60 secondi il refresh token di prima.
+                await attendi(Self.riprovaRinnovoSecondi)
+            }
         }
     }
 
     private func salva(_ t: Token) {
         token = t.accessToken
         tokenScadeIl = Date().addingTimeInterval(TimeInterval(t.expiresIn))
-        Portachiavi.salva(t.refreshToken, per: server)
+        deposito.salva(t.refreshToken, per: server)
     }
 
     // MARK: Il Mac

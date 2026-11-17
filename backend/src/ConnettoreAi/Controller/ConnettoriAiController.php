@@ -18,7 +18,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * I Mac collegati alla famiglia, dall'app (firewall "api", utente):
  *   GET    /api/tenants/{t}/connettori-ai                elenco
  *   GET    /api/tenants/{t}/connettori-ai/richiesta?codice=…  la richiesta da approvare
- *   POST   /api/tenants/{t}/connettori-ai/approva        {userCode, nome?, codice2fa?}
+ *   POST   /api/tenants/{t}/connettori-ai/approva        {userCode, nome?, codice2fa? | password?}
  *   POST   /api/tenants/{t}/connettori-ai/nega           {userCode}
  *   PATCH  /api/tenants/{t}/connettori-ai/{id}           {nome}
  *   DELETE /api/tenants/{t}/connettori-ai/{id}           scollega
@@ -61,7 +61,7 @@ final class ConnettoriAiController extends AbstractController
     {
         $tenant = $this->access->requireTenant($tenantId, ConnettoriAi::PERMESSO);
         $d = $this->body($request);
-        $this->connettori->approva($tenant, $this->access->currentUser(), (string) ($d['userCode'] ?? ''), $this->str($d, 'nome', 80), $this->str($d, 'codice2fa', 20));
+        $this->connettori->approva($tenant, $this->access->currentUser(), (string) ($d['userCode'] ?? ''), $this->str($d, 'nome', 80), $this->str($d, 'codice2fa', 20), \is_string($d['password'] ?? null) ? $d['password'] : null);
 
         return $this->json(['ok' => true]);
     }

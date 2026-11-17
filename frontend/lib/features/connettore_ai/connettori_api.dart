@@ -61,14 +61,26 @@ class ConnettoriApi {
         return [for (final c in r.data['connettori'] as List) ConnettoreAi.fromJson(Map<String, dynamic>.from(c as Map))];
       });
 
+  /// Una richiesta vale 10 minuti dal momento in cui il Mac la fa.
+  static const durataRichiesta = Duration(minutes: 10);
+
   /// La richiesta da approvare con quel codice (404 se scaduta o sbagliata).
-  static Future<({String userCode, String nome})> richiesta(String t, String codice) => chiamaApi(() async {
+  static Future<({String userCode, String nome, DateTime? fattaIl})> richiesta(String t, String codice) => chiamaApi(() async {
         final r = await _dio.get('/tenants/$t/connettori-ai/richiesta', queryParameters: {'codice': codice});
-        return (userCode: r.data['userCode'] as String, nome: r.data['nome'] as String);
+        final scade = DateTime.tryParse(r.data['scadeIl'] as String? ?? '');
+        return (userCode: r.data['userCode'] as String, nome: r.data['nome'] as String, fattaIl: scade?.subtract(durataRichiesta));
       });
 
-  static Future<void> approva(String t, String codice, {String? nome, String? codice2fa}) => chiamaApi(() async {
-        await _dio.post('/tenants/$t/connettori-ai/approva', data: {'userCode': codice, if (nome != null) 'nome': nome, if (codice2fa != null) 'codice2fa': codice2fa});
+  /// Il corpo dell'approvazione: il codice 2FA o la password, mai vuoti.
+  static Map<String, dynamic> corpoApprovazione(String codice, {String? nome, String? codice2fa, String? password}) => {
+        'userCode': codice,
+        if (nome != null && nome.isNotEmpty) 'nome': nome,
+        if (codice2fa != null && codice2fa.isNotEmpty) 'codice2fa': codice2fa,
+        if (password != null && password.isNotEmpty) 'password': password,
+      };
+
+  static Future<void> approva(String t, String codice, {String? nome, String? codice2fa, String? password}) => chiamaApi(() async {
+        await _dio.post('/tenants/$t/connettori-ai/approva', data: corpoApprovazione(codice, nome: nome, codice2fa: codice2fa, password: password));
       });
 
   static Future<void> nega(String t, String codice) => chiamaApi(() async {

@@ -1,8 +1,10 @@
 import Foundation
 
 public enum ErroreServer: Error, Equatable, LocalizedError {
-    /// 401: token scaduto o connettore scollegato.
+    /// 401: il token di accesso non vale più (si rinnova).
     case nonAutorizzato
+    /// Il server ha rifiutato il refresh token: il Mac non è più collegato.
+    case scollegato
     /// 409: il lavoro non è più nostro, o il modello non è tra i verificati.
     case conflitto(String)
     /// 429: troppo presto.
@@ -12,7 +14,8 @@ public enum ErroreServer: Error, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .nonAutorizzato: "Collegamento non più valido: ricollega il Mac."
+        case .nonAutorizzato: "Il server non ha accettato il token di accesso."
+        case .scollegato: "Il Mac è stato scollegato dall'app: collegalo di nuovo."
         case let .conflitto(m): m
         case .troppoPresto: "Il server chiede di rallentare."
         case let .http(c, m): "Il server ha risposto \(c): \(m)"

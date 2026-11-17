@@ -38,7 +38,11 @@ final class Avvio: NSObject, NSApplicationDelegate {
 
     @MainActor func applicationDidFinishLaunching(_ notification: Notification) {
         Self.connettore.avvia()
-        if Portachiavi.leggi(per: Self.connettore.server) == nil { Self.mostraImpostazioni() }
+        if !Self.connettore.collegato { Self.mostraImpostazioni() }
+        // Al risveglio un giro subito, senza aspettare l'intervallo.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in Self.connettore.risvegliato() }
+        }
         // Per le prove (sviluppo): --collega "Nome" fa come il pulsante "Collega alla famiglia".
         let arg = ProcessInfo.processInfo.arguments
         if let i = arg.firstIndex(of: "--collega"), i + 1 < arg.count {

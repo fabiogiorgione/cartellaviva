@@ -217,7 +217,7 @@ Quali documenti (`EsempiPratica`): con voci confermate (positivi); con proposte 
 
 Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, prima delle etichette restavano i nomi veri delle persone scritti nei documenti; ora no. Non è perfetto (un indirizzo resta): il file va guardato prima di farlo uscire dal server. Lo strato LoRA allenato sui dati veri sarebbe a sua volta un dato personale; allenato sugli esempi anonimizzati no.
 
-**Regole ISEE per gli anni passati**: `isee-2024.yaml` (dati 2022) e `isee-2025.yaml` (dati 2023), provvisorie (stesse regole della DSU 2026), per ricostruire gli anni passati come banco di prova.
+**Regole ISEE per gli altri anni**: da `isee-2020.yaml` a `isee-2025.yaml` e `isee-2027.yaml` sono provvisorie, con le stesse regole della DSU 2026; solo `isee-2026.yaml` ha la data in `verificato`. Le istruzioni INPS di quegli anni non sono state ricontrollate. Servono soprattutto a ricostruire gli anni passati come banco di prova.
 
 ### Selezione dei documenti: banco di prova e correzioni (13/11/2026)
 
@@ -249,7 +249,7 @@ Restano date, nomi di aziende ed enti, il resto del testo. Nei dati di prova, pr
 - **`zero: true`** sul campo: l'importo può valere zero. Sui conti (saldo, giacenza e i valori della precompilata): un conto aperto a fine anno e ancora vuoto va dichiarato lo stesso, prima si perdeva.
 - **Tipo dal titolo** (`AiVociSuggeritore::tipoValido`): una frase di un tipo nei primi 1.500 caratteri o nel nome del file vince sul tipo dell'AI ("Certificazione Unica" in testa è una CU anche se l'AI dice 730). Solo frasi di più parole: "farmac" in cima a uno scontrino è il nome della farmacia.
 
-**Le annate 2020–2025 come banco** (15/11/2026, cartelle ISEE vere dell'autore, fuori dal repository): selezione giusta su tutti i file di 2020, 2023, 2024, 2025 e 2026; con l'AI la voce del requisito giusto in tutti i documenti che ne aspettano una. Correzioni nate da qui:
+**Le annate ISEE dell'autore come banco** (15/11/2026, cartelle vere fuori dal repository, annate 2020, 2023, 2024, 2025 e 2026; 2021 e 2022 non provate): selezione giusta su tutti i file; con l'AI la voce del requisito giusto in quasi tutti i documenti che ne aspettano una (il risultato cambia un poco da un giro all'altro). Saldi e giacenze dei conti coincidono con le DSU presentate al CAF dopo le correzioni qui sotto. Le regole sono state corrette sulle stesse cartelle: è un confronto, non una misura indipendente. Le regole degli altri anni sono copie provvisorie di quelle 2026. Correzioni nate da qui:
 
 - **Anno dichiarato dal documento** (`TestoVoci::anniDichiarati`, `EstrattoreVoci::candidati`): "relativa all'anno 2022", "730/2023 Redditi 2022", "anno d'imposta", "anno riferimento", "riferita all'anno", "al 31.12.2022". Se il documento dichiara solo anni diversi da quello di riferimento della pratica vale come vecchio: niente CU, 730 o estratti conto dell'anno prima, anche se caricati da poco (prima contava solo la data del documento). Se non dichiara niente, o con "analizza tutti", resta. "Fino al 31/12/2000" (il TFR nella CU) non conta.
 - Un fondo pensione non è un conto (`senza` "previdenza complementare", "prestazioni pensionistiche"); il modulo regionale del contributo carburante non è un libretto né un affitto ("locazione finanziaria"); "prima immatricolazione" riconosce un libretto letto male dall'OCR; "dichiarazione 730" riconosce la ricevuta del 730.

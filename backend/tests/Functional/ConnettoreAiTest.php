@@ -69,13 +69,27 @@ final class ConnettoreAiTest extends ApiTestCase
         $this->assertStatus(403);
         $vista = $this->request('GET', $this->url('/connettori-ai/richiesta?codice='.strtolower($d['user_code'])), token: $this->token);
         self::assertSame('MacBook di Mario', $vista['nome']);
-        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => strtolower(str_replace('-', ' ', $d['user_code'])), 'nome' => 'Mac di casa'], $this->token);
+        // Senza 2FA serve la password: senza, 403; sbagliata, 422 e audit; giusta, 200.
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code']], $this->token);
+        $this->assertStatus(403);
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code'], 'password' => 'sbagliata'], $this->token);
+        $this->assertStatus(422);
+        self::assertCount(1, $this->auditRows('connettore_ai.approvato', 'failure'));
+        self::assertSame('in_attesa', $this->em()->getConnection()->fetchOne('SELECT stato FROM connettore_ai_richiesta WHERE user_code = :c', ['c' => $d['user_code']]));
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => strtolower(str_replace('-', ' ', $d['user_code'])), 'nome' => 'Mac di casa', 'password' => self::PASSWORD], $this->token);
         $this->assertStatus(200);
+        self::assertEmailCount(0);
 
         $this->em()->getConnection()->executeStatement('UPDATE connettore_ai_richiesta SET ultimo_poll_il = NULL');
         $t = $poll();
         $this->assertStatus(200);
         self::assertSame(['Bearer', 3600, 'ai-connector'], [$t['token_type'], $t['expires_in'], $t['scope']]);
+        // Collegamento fatto: un'email a chi ha approvato, con il nome del Mac e dove scollegarlo.
+        self::assertEmailCount(1);
+        $email = self::getMailerMessage();
+        self::assertEmailAddressContains($email, 'To', 'owner@example.com');
+        self::assertEmailHtmlBodyContains($email, 'Mac di casa');
+        self::assertEmailHtmlBodyContains($email, 'AI sul tuo Mac');
         // Il codice vale una volta sola.
         self::assertSame('invalid_grant', $poll()['error']);
         // A database solo gli hash.
@@ -91,8 +105,60 @@ final class ConnettoreAiTest extends ApiTestCase
         $d3 = $this->request('POST', '/api/ai-connector-plugin/oauth/device', ['client_id' => 'cartellaviva-mac', 'nome' => 'Altro']);
         $this->em()->getConnection()->executeStatement("UPDATE connettore_ai_richiesta SET scade_il = NOW() - INTERVAL '1 minute' WHERE user_code = :c", ['c' => $d3['user_code']]);
         self::assertSame('expired_token', $this->request('POST', '/api/ai-connector-plugin/oauth/token', ['client_id' => 'cartellaviva-mac', 'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code', 'device_code' => $d3['device_code']])['error']);
-        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d3['user_code']], $this->token);
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d3['user_code'], 'password' => self::PASSWORD], $this->token);
         $this->assertStatus(404);
+    }
+
+    public function testApprovalWithoutPasswordOrSecondFactorIsRefused(): void
+    {
+        // Accesso solo con Google: niente password e niente 2FA, niente Mac.
+        $owner = $this->em()->find(User::class, $this->owner->getId());
+        $owner->setPassword('');
+        $this->em()->flush();
+        $this->em()->clear();
+        $d = $this->request('POST', '/api/ai-connector-plugin/oauth/device', ['client_id' => 'cartellaviva-mac', 'nome' => 'Mac']);
+        $r = $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code'], 'password' => 'qualsiasi'], $this->token);
+        $this->assertStatus(409);
+        self::assertStringContainsString('verifica in due passaggi', (string) ($r['detail'] ?? $r['message'] ?? json_encode($r)));
+        self::assertSame('in_attesa', $this->em()->getConnection()->fetchOne('SELECT stato FROM connettore_ai_richiesta WHERE user_code = :c', ['c' => $d['user_code']]));
+    }
+
+    public function testTwoSimultaneousExchangesCreateOneMac(): void
+    {
+        // La richiesta si legge con un blocco in scrittura: due scambi insieme dello
+        // stesso codice non creano due connettori.
+        $d = $this->request('POST', '/api/ai-connector-plugin/oauth/device', ['client_id' => 'cartellaviva-mac', 'nome' => 'Mac']);
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code'], 'password' => self::PASSWORD], $this->token);
+        $this->assertStatus(200);
+        $registro = static::getContainer()->get('doctrine.debug_data_holder');
+        $registro->reset();
+        $this->request('POST', '/api/ai-connector-plugin/oauth/token', ['client_id' => 'cartellaviva-mac', 'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code', 'device_code' => $d['device_code']]);
+        $this->assertStatus(200);
+        $query = array_column($registro->getData()['default'] ?? [], 'sql');
+        self::assertNotEmpty(array_filter($query, static fn (string $q) => str_contains($q, 'connettore_ai_richiesta') && str_contains($q, 'FOR UPDATE')), implode("\n", $query));
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM connettore_ai'));
+    }
+
+    public function testMacExtendingEveryMinuteStaysOnline(): void
+    {
+        [$access] = $this->collega();
+        $this->request('PUT', '/api/ai-connector-plugin/me', [], $access);
+        $this->documento('casa', 'scontrino.png', self::SCONTRINO);
+        $this->avvia('730', 2025);
+        $l = $this->request('GET', '/api/ai-connector-plugin/lavori', token: $access)['lavori'][0];
+        $servizio = static::getContainer()->get(\App\ConnettoreAi\ConnettoriAi::class);
+        // Ultima proroga 60 secondi fa: ancora online; poi la proroga successiva.
+        $this->em()->getConnection()->executeStatement("UPDATE connettore_ai SET ultimo_contatto = NOW() - INTERVAL '60 seconds'");
+        $this->em()->clear();
+        self::assertNotNull($servizio->online($this->tenant));
+        $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/proroga", [], $access);
+        $this->assertStatus(200);
+        $this->em()->clear();
+        self::assertNotNull($servizio->online($this->tenant));
+        // Muto per più di 90 secondi: spento.
+        $this->em()->getConnection()->executeStatement("UPDATE connettore_ai SET ultimo_contatto = NOW() - INTERVAL '91 seconds'");
+        $this->em()->clear();
+        self::assertNull($servizio->online($this->tenant));
     }
 
     public function testApprovalNeedsTheSecondFactorWhenEnabled(): void
@@ -131,12 +197,34 @@ final class ConnettoreAiTest extends ApiTestCase
         $this->assertStatus(401);
         $this->request('PUT', '/api/ai-connector-plugin/me', [], $nuovi['access_token']);
         $this->assertStatus(200);
-        // Il vecchio refresh token torna: qualcuno l'ha copiato, il connettore si scollega.
-        self::assertSame('invalid_grant', $this->rinnova($refresh)['error']);
+        // Il vecchio refresh token torna entro 60 secondi (la risposta si era persa):
+        // vale ancora, con token nuovi; i token di accesso precedenti no.
+        $scadenza = fn () => $this->em()->getConnection()->fetchOne('SELECT access_scade_il FROM connettore_ai');
+        $primaScadenza = $scadenza();
+        $ancora = $this->rinnova($refresh);
+        $this->assertStatus(200);
+        self::assertNotSame($nuovi['refresh_token'], $ancora['refresh_token']);
+        self::assertLessThanOrEqual(3600, $ancora['expires_in']);
         $this->request('PUT', '/api/ai-connector-plugin/me', [], $nuovi['access_token']);
         $this->assertStatus(401);
-        self::assertSame('invalid_grant', $this->rinnova($nuovi['refresh_token'])['error']);
-        self::assertCount(1, $this->auditRows('connettore_ai.scollegato'));
+        $this->request('PUT', '/api/ai-connector-plugin/me', [], $ancora['access_token']);
+        $this->assertStatus(200);
+        // Un secondo tentativo nella finestra funziona ancora, e la finestra non si allunga.
+        $terzi = $this->rinnova($refresh);
+        $this->assertStatus(200);
+        self::assertSame($primaScadenza, $scadenza());
+        self::assertCount(0, $this->auditRows('connettore_ai.scollegato'));
+
+        // Dopo la finestra il vecchio refresh token torna: qualcuno l'ha copiato, il connettore si scollega.
+        $this->em()->getConnection()->executeStatement("UPDATE connettore_ai SET access_scade_il = access_scade_il - INTERVAL '61 seconds'");
+        $this->em()->clear();
+        self::assertSame('invalid_grant', $this->rinnova($refresh)['error']);
+        $this->request('PUT', '/api/ai-connector-plugin/me', [], $terzi['access_token']);
+        $this->assertStatus(401);
+        self::assertSame('invalid_grant', $this->rinnova($terzi['refresh_token'])['error']);
+        $scollegato = $this->auditRows('connettore_ai.scollegato');
+        self::assertCount(1, $scollegato);
+        self::assertSame(['motivo' => 'refresh_riusato'], json_decode((string) $scollegato[0]['context'], true));
     }
 
     public function testDocumentsGoToTheOnlineMacWhichReturnsOnlyTheModelValues(): void
@@ -285,7 +373,7 @@ final class ConnettoreAiTest extends ApiTestCase
     private function collega(): array
     {
         $d = $this->request('POST', '/api/ai-connector-plugin/oauth/device', ['client_id' => 'cartellaviva-mac', 'nome' => 'MacBook di Mario']);
-        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code']], $this->token);
+        $this->request('POST', $this->url('/connettori-ai/approva'), ['userCode' => $d['user_code'], 'password' => self::PASSWORD], $this->token);
         $this->assertStatus(200);
         $t = $this->request('POST', '/api/ai-connector-plugin/oauth/token', ['client_id' => 'cartellaviva-mac', 'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code', 'device_code' => $d['device_code']]);
         $this->assertStatus(200);

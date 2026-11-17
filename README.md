@@ -50,7 +50,7 @@ Sulla cifratura serve precisione. I documenti delle categorie sensibili sono cif
 
 Ogni proposta dice da quale documento viene e si conferma, si corregge o si scarta: niente entra in una pratica senza conferma. Alla fine c'è un riepilogo da portare al CAF o da confrontare con la precompilata.
 
-Le regole di ogni pratica sono file YAML con le fonti ufficiali (`backend/config/pratiche/`). L'analisi ha un banco di prova su cartelle vere. Sulle pratiche ISEE dell'autore dal 2020 al 2026 (circa 150 file), i documenti giusti vengono riconosciuti in tutte le annate, e saldi e giacenze coincidono con le DSU presentate al CAF.
+Le regole di ogni pratica sono file YAML con le fonti ufficiali (`backend/config/pratiche/`). L'analisi ha un banco di prova su cartelle vere. Sulle cartelle ISEE dell'autore (circa 150 file, annate 2020, 2023, 2024, 2025 e 2026) i documenti giusti vengono riconosciuti. Saldi e giacenze dei conti coincidono con le DSU presentate al CAF, dopo le correzioni nate da questo confronto. È una prova sugli stessi dati usati per correggere le regole, non una misura indipendente; solo le regole 2026 sono verificate, quelle degli altri anni sono copie provvisorie.
 
 **Per gli enti** (scuole e associazioni verificate):
 - richieste alle famiglie: firma, invio di un documento, presa visione;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:get/get.dart';
+import 'package:cartellaviva/features/account/model/me.dart';
 import 'package:cartellaviva/features/connettore_ai/connettori_api.dart';
 import 'package:cartellaviva/helpers/services/api/api_exception.dart';
 import 'package:cartellaviva/helpers/services/session_service.dart';
@@ -27,7 +28,8 @@ class _CollegaMacScreenState extends State<CollegaMacScreen> {
   final _codice = TextEditingController(text: Get.parameters['codice'] ?? '');
   final _nome = TextEditingController();
   final _codice2fa = TextEditingController();
-  ({String userCode, String nome})? _richiesta;
+  final _password = TextEditingController();
+  ({String userCode, String nome, DateTime? fattaIl})? _richiesta;
   String? _errore;
   bool _occupato = false;
   bool _fatto = false;
@@ -43,12 +45,13 @@ class _CollegaMacScreenState extends State<CollegaMacScreen> {
     _codice.dispose();
     _nome.dispose();
     _codice2fa.dispose();
+    _password.dispose();
     super.dispose();
   }
 
   String? get _tenant => session.currentTenantId;
   bool get _puo => session.can(permessoConnettoreAi);
-  bool get _serve2fa => session.me?.twoFactorEnabled ?? false;
+  ConfermaMac get _conferma => confermaMac(session.me);
 
   Future<void> _cerca() async {
     final t = _tenant;
@@ -77,7 +80,10 @@ class _CollegaMacScreenState extends State<CollegaMacScreen> {
     setState(() => _occupato = true);
     try {
       if (approva) {
-        await ConnettoriApi.approva(t, r.userCode, nome: _nome.text.trim().isEmpty ? null : _nome.text.trim(), codice2fa: _serve2fa ? _codice2fa.text.trim() : null);
+        await ConnettoriApi.approva(t, r.userCode,
+            nome: _nome.text.trim().isEmpty ? null : _nome.text.trim(),
+            codice2fa: _conferma == ConfermaMac.codice2fa ? _codice2fa.text.trim() : null,
+            password: _conferma == ConfermaMac.password ? _password.text : null);
       } else {
         await ConnettoriApi.nega(t, r.userCode);
       }
@@ -137,22 +143,106 @@ class _CollegaMacScreenState extends State<CollegaMacScreen> {
         ),
         const SizedBox(height: 16),
         Align(alignment: Alignment.centerLeft, child: FilledButton(onPressed: _occupato ? null : _cerca, child: const Text('Continua'))),
-      ] else ...[
-        Testo.bodyMedium('Collegare a $famiglia il Mac con il codice ${r.userCode}?', fontWeight: FontWeight.w500),
-        const SizedBox(height: 12),
-        TextField(controller: _nome, maxLength: 80, decoration: const InputDecoration(labelText: 'Nome del Mac')),
-        if (_serve2fa) ...[
-          const SizedBox(height: 8),
-          TextField(controller: _codice2fa, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Codice della verifica in due passaggi')),
-        ],
-        const SizedBox(height: 16),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          FilledButton(onPressed: _occupato ? null : () => _rispondi(true), child: const Text('Approva')),
-          OutlinedButton(onPressed: _occupato ? null : () => _rispondi(false), child: const Text('Rifiuta')),
+      ] else
+        ApprovazioneMac(
+          famiglia: famiglia,
+          codice: r.userCode,
+          fattaIl: r.fattaIl,
+          nome: _nome,
+          conferma: _conferma,
+          codice2fa: _codice2fa,
+          password: _password,
+          occupato: _occupato,
+          onRisposta: _rispondi,
+        ),
+    ]);
+  }
+}
+
+/// Come si conferma l'approvazione di un Mac: il codice della 2FA se è attiva,
+/// altrimenti la password; senza nessuno dei due non si può (accesso solo con Google).
+enum ConfermaMac { codice2fa, password, impossibile }
+
+ConfermaMac confermaMac(Me? me) {
+  if (me?.twoFactorEnabled ?? false) return ConfermaMac.codice2fa;
+  return (me?.hasPassword ?? true) ? ConfermaMac.password : ConfermaMac.impossibile;
+}
+
+/// "adesso", "1 minuto fa", "7 minuti fa".
+String fattaDa(DateTime fattaIl, DateTime ora) {
+  final minuti = ora.difference(fattaIl).inMinutes;
+  if (minuti < 1) return 'adesso';
+  return minuti == 1 ? '1 minuto fa' : '$minuti minuti fa';
+}
+
+/// La richiesta da approvare: avviso, nome, conferma e pulsanti.
+class ApprovazioneMac extends StatelessWidget {
+  const ApprovazioneMac({
+    super.key,
+    required this.famiglia,
+    required this.codice,
+    required this.nome,
+    required this.conferma,
+    required this.codice2fa,
+    required this.password,
+    required this.onRisposta,
+    this.fattaIl,
+    this.occupato = false,
+  });
+
+  final String famiglia, codice;
+  final DateTime? fattaIl;
+  final TextEditingController nome, codice2fa, password;
+  final ConfermaMac conferma;
+  final bool occupato;
+  final void Function(bool approva) onRisposta;
+
+  @override
+  Widget build(BuildContext context) {
+    final quando = fattaIl == null ? '' : ' (richiesta ${fattaDa(fattaIl!, DateTime.now())})';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Testo.bodyMedium('Collegare a $famiglia il Mac con il codice $codice?$quando', fontWeight: FontWeight.w500),
+      const SizedBox(height: 12),
+      TextField(controller: nome, maxLength: 80, decoration: const InputDecoration(labelText: 'Nome del Mac')),
+      if (conferma == ConfermaMac.codice2fa)
+        TextField(controller: codice2fa, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Codice della verifica in due passaggi')),
+      if (conferma == ConfermaMac.password)
+        TextField(
+          key: const ValueKey('password-collega-mac'),
+          controller: password,
+          obscureText: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(labelText: 'Password del tuo account'),
+        ),
+      const SizedBox(height: 16),
+      Container(
+        key: const ValueKey('avviso-collega-mac'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: context.colori.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8), border: Border.all(color: context.colori.warning)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(LucideIcons.triangle_alert, color: context.colori.warning),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Testo.bodyMedium(
+                'Approva solo se questo codice è sullo schermo di un Mac tuo, davanti a te. Quel Mac riceverà il testo dei documenti da analizzare.',
+                fontWeight: FontWeight.w500),
+          ),
         ]),
-        const SizedBox(height: 8),
-        const Testo.bodySmall('Se non hai avviato tu il collegamento su un tuo Mac, rifiuta.', tenue: true),
-      ],
+      ),
+      const SizedBox(height: 16),
+      if (conferma == ConfermaMac.impossibile) ...[
+        const Testo.bodyMedium('Per collegare un Mac attiva la verifica in due passaggi o imposta una password in Sicurezza e accesso.'),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          FilledButton(onPressed: () => Get.offNamed('/account/security'), child: const Text('Vai a Sicurezza e accesso')),
+          OutlinedButton(onPressed: occupato ? null : () => onRisposta(false), child: const Text('Rifiuta')),
+        ]),
+      ] else
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          FilledButton(onPressed: occupato ? null : () => onRisposta(true), child: const Text('Approva')),
+          OutlinedButton(onPressed: occupato ? null : () => onRisposta(false), child: const Text('Rifiuta')),
+        ]),
     ]);
   }
 }

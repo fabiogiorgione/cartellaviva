@@ -9,7 +9,7 @@ Questa guida fa parte del manuale tecnico; la presentazione del progetto è nel 
   - l'app Android in release è firmata con la chiave di debug (`frontend/android/app/build.gradle.kts`): per distribuirla serve la propria chiave;
   - l'app per Mac (`connettore-mac/`) è firmata ad hoc: per distribuirla fuori dal proprio Mac servono un Developer ID e la notarizzazione Apple; mancano anche aggiornamenti automatici, icona e installer.
 - **Test**:
-  - backend: 313 test al 15/11/2026; alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
+  - backend: 317 test al 17/11/2026 (frontend 129, connettore Mac 11); alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
   - frontend (misura alla 0.1.0): 110 test, che toccano 89 file su 185 di `frontend/lib` e, di quelli, il 34% delle righe. Le parti meno coperte sono l'account (13%) e il layout (9%).
 - **Analisi statica**: PHPStan è al livello 5, con 51 segnalazioni ancora in `backend/phpstan-baseline.neon`. L'analizzatore di Flutter dà 8 avvisi informativi.
 - **Dipendenze**:
@@ -20,7 +20,7 @@ Questa guida fa parte del manuale tecnico; la presentazione del progetto è nel 
 - **Flutter**: l'interfaccia è solo in italiano (testi nel codice). Per aggiungere una lingua servono le traduzioni (es. `flutter_localizations` con file ARB) e `supportedLocales` in `main.dart`.
 - **Token sul web**: `flutter_secure_storage` sul web usa localStorage cifrato, che resta esposto a XSS. In futuro si può spostare il refresh token in un cookie HttpOnly (Gesdinet supporta `cookie:`).
 - **Identificativi**: package Dart `cartellaviva`; `applicationId` Android e bundle id iOS/macOS `it.cartellaviva.app`. Non cambiarli dopo la prima pubblicazione sugli store (si crea un'app diversa). Le app Android e iOS registrate in Firebase devono usare questo identificativo.
-- **Analisi dei documenti**: le pratiche ISEE dal 2020 al 2023 usano regole provvisorie (copie del 2024) e anche quelle 2024–2027 vanno ricontrollate ogni anno sulle istruzioni INPS (`verificato` nei file di `config/pratiche/`). L'analisi con il modello Apple sull'iPhone è provata sul simulatore; il connettore Mac su un solo Mac.
+- **Analisi dei documenti**: solo le regole ISEE 2026 sono verificate sulle istruzioni INPS; quelle dal 2020 al 2025 e del 2027 sono copie provvisorie delle 2026 (`verificato` vuoto nei file di `config/pratiche/`). L'analisi con il modello Apple sull'iPhone è provata sul simulatore; il connettore Mac su un solo Mac.
 - **Produzione**:
   - con `compose.prod.yaml`, `JWT_PASSPHRASE`, `APP_SECRET`, `APP_ENCRYPTION_KEY`, la password del database e `MAILER_DSN` stanno nel file `.env` del server (permessi 600, fuori dal repository) e arrivano ai container come variabili d'ambiente: chi può usare Docker sul server (root, gruppo `docker`) li vede con `docker inspect`. La master key invece è un secret Docker (file montato in sola lettura). Miglioramento possibile: passare anche gli altri come secret, letti con `%env(file:...)%`. `APP_ENCRYPTION_KEY` non va mai cambiata senza ri-cifrare i segreti TOTP;
   - le attività pianificate (`src/Schedule.php`, oggi la pulizia oraria di challenge 2FA, `state` OAuth e link di esportazione scaduti, l'eliminazione delle famiglie arrivate a scadenza e i promemoria giornalieri delle scadenze) girano nel worker sul trasporto `scheduler_default`: il worker deve essere sempre attivo;

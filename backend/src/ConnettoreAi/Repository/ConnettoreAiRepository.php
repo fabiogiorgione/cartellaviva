@@ -5,6 +5,8 @@ namespace App\ConnettoreAi\Repository;
 use App\ConnettoreAi\Entity\ConnettoreAi;
 use App\Tenancy\Entity\Tenant;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /** @extends ServiceEntityRepository<ConnettoreAi> */
@@ -20,14 +22,19 @@ class ConnettoreAiRepository extends ServiceEntityRepository
         return $this->findOneBy(['accessTokenHash' => $hash]);
     }
 
-    public function perRefreshToken(string $hash): ?ConnettoreAi
+    /**
+     * Il connettore con quel refresh token, attuale o precedente, con un blocco
+     * in scrittura (dentro una transazione): un rinnovo alla volta.
+     */
+    public function perRefreshBloccato(string $hash): ?ConnettoreAi
     {
-        return $this->findOneBy(['refreshTokenHash' => $hash]);
-    }
-
-    public function perRefreshPrecedente(string $hash): ?ConnettoreAi
-    {
-        return $this->findOneBy(['refreshPrecedenteHash' => $hash]);
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.refreshTokenHash = :h OR c.refreshPrecedenteHash = :h')->setParameter('h', $hash)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
     }
 
     /** @return list<ConnettoreAi> della famiglia, non revocati, dal più recente */

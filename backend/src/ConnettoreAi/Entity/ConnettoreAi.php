@@ -29,6 +29,8 @@ class ConnettoreAi
     public const ONLINE_SECONDI = 90;
     public const ACCESSO_SECONDI = 3600;
     public const RINNOVO_GIORNI = 30;
+    /** Per quanto il refresh token di prima vale ancora dopo una rotazione (risposta persa per strada). */
+    public const TOLLERANZA_SECONDI = 60;
 
     #[ORM\Id]
     #[ORM\Column(type: UuidType::NAME, unique: true)]
@@ -171,6 +173,41 @@ class ConnettoreAi
         $this->accessScadeIl = (new \DateTimeImmutable())->modify('+'.self::ACCESSO_SECONDI.' seconds');
         $this->refreshPrecedenteHash = $this->refreshTokenHash;
         $this->refreshTokenHash = $refreshTokenHash;
+    }
+
+    /**
+     * Il refresh token di prima, presentato entro TOLLERANZA_SECONDI dalla
+     * rotazione, dà una nuova coppia di token. Il momento della rotazione si
+     * ricava dalla scadenza dell'accesso, che ruotaToken() fissa a rotazione +
+     * ACCESSO_SECONDI: niente colonna in più.
+     */
+    public function inTolleranza(\DateTimeImmutable $ora): bool
+    {
+        $rotazione = $this->accessScadeIl->modify('-'.self::ACCESSO_SECONDI.' seconds');
+
+        return null !== $this->refreshPrecedenteHash && $rotazione > $ora->modify('-'.self::TOLLERANZA_SECONDI.' seconds');
+    }
+
+    /**
+     * Nuovi token dal refresh token di prima, dentro la tolleranza: il token
+     * precedente resta quello presentato e la scadenza dell'accesso non cambia,
+     * così la finestra non si allunga. I token emessi alla rotazione non valgono più.
+     */
+    public function ruotaInTolleranza(string $accessTokenHash, string $refreshTokenHash): void
+    {
+        $this->accessTokenHash = $accessTokenHash;
+        $this->refreshTokenHash = $refreshTokenHash;
+    }
+
+    public function getRefreshTokenHash(): string
+    {
+        return $this->refreshTokenHash;
+    }
+
+    /** Secondi di validità del token di accesso attuale. */
+    public function accessoSecondi(\DateTimeImmutable $ora): int
+    {
+        return max(0, $this->accessScadeIl->getTimestamp() - $ora->getTimestamp());
     }
 
     public function getRefreshScadeIl(): \DateTimeImmutable
