@@ -24,6 +24,7 @@ struct CartellaVivaConnettoreApp: App {
         switch connettore.stato {
         case .analizza: "brain.head.profile.fill"
         case .pronto: "brain.head.profile"
+        case .avvio: "hourglass"
         case .scollegato, .abbinamento: "link.badge.plus"
         default: "exclamationmark.triangle"
         }
@@ -37,8 +38,9 @@ final class Avvio: NSObject, NSApplicationDelegate {
     @MainActor private static var finestra: NSWindow?
 
     @MainActor func applicationDidFinishLaunching(_ notification: Notification) {
-        Self.connettore.avvia()
-        if !Self.connettore.collegato { Self.mostraImpostazioni() }
+        // La lettura del Portachiavi non ferma l'icona: se macOS chiede il permesso,
+        // nel frattempo il menu mostra "Avvio".
+        Task { if await !Self.connettore.avvia() { Self.mostraImpostazioni() } }
         // Al risveglio un giro subito, senza aspettare l'intervallo.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in Self.connettore.risvegliato() }
@@ -156,6 +158,8 @@ struct Impostazioni: View {
                     Button("Collega alla famiglia") { salvaServer(); Task { await c.collega(nome: nomeMac) } }
                         .disabled(ollama == nil || !modelli.contains(c.modello))
                     if case let .errore(m) = c.stato { Text(m).font(.caption).foregroundStyle(.red) }
+                case .avvio:
+                    Label(c.stato.descrizione, systemImage: "hourglass")
                 case let .abbinamento(codice, link):
                     Abbinamento(codice: codice, link: link)
                     Button("Annulla") { c.annullaAbbinamento() }

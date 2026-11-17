@@ -20,12 +20,16 @@ final class ReteFinta: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var regole: [Regola] = []
     nonisolated(unsafe) private static var chiamate: [String: Int] = [:]
     nonisolated(unsafe) private static var corpi: [String] = []
+    nonisolated(unsafe) private static var estranee = 0
+    nonisolated(unsafe) private static var prova = 0
 
     static func prepara(_ r: [Regola]) {
         lucchetto.withLock {
             regole = r
             chiamate = [:]
             corpi = []
+            estranee = 0
+            prova += 1
         }
     }
 
@@ -40,6 +44,7 @@ final class ReteFinta: URLProtocol, @unchecked Sendable {
     static func volte(_ percorso: String) -> Int { lucchetto.withLock { chiamate[percorso] ?? 0 } }
     static var totale: Int { lucchetto.withLock { chiamate.values.reduce(0, +) } }
     static var corpiInviati: [String] { lucchetto.withLock { corpi } }
+    static var richiesteEstranee: Int { lucchetto.withLock { estranee } }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -53,6 +58,18 @@ final class ReteFinta: URLProtocol, @unchecked Sendable {
             while s.hasBytesAvailable { let n = s.read(buf, maxLength: 4096); if n <= 0 { break }; corpo.append(buf, count: n) }
             buf.deallocate()
             s.close()
+        }
+        // Una richiesta rimasta da una prova di prima non conta e non riceve risposta.
+        let estranea: Bool = Self.lucchetto.withLock {
+            guard request.value(forHTTPHeaderField: "X-Prova") == String(Self.prova) else {
+                Self.estranee += 1
+                return true
+            }
+            return false
+        }
+        if estranea {
+            client?.urlProtocol(self, didFailWithError: URLError(.cancelled))
+            return
         }
         let (regola, n): (Regola?, Int) = Self.lucchetto.withLock {
             let r = Self.regole.first { path.hasSuffix($0.percorso) }
@@ -85,26 +102,67 @@ final class ReteFinta: URLProtocol, @unchecked Sendable {
     static func sessione() -> URLSession {
         let c = URLSessionConfiguration.ephemeral
         c.protocolClasses = [ReteFinta.self]
+        c.httpAdditionalHeaders = ["X-Prova": String(lucchetto.withLock { prova })]
         return URLSession(configuration: c)
     }
 }
 
-/// Il Portachiavi finto: in memoria, ricorda se è stato svuotato.
+/// Il Portachiavi finto: in memoria, ricorda se è stato svuotato e quante volte
+/// è stato usato dal thread principale (quello che disegna icona e menu).
 final class DepositoFinto: DepositoToken, @unchecked Sendable {
     private let lucchetto = NSLock()
     private var valore: String?
-    private(set) var eliminato = false
+    private var _eliminato = false
+    private var _sulThreadPrincipale = 0
+    var eliminato: Bool { lucchetto.withLock { _eliminato } }
+    var sulThreadPrincipale: Int { lucchetto.withLock { _sulThreadPrincipale } }
 
     init(_ valore: String?) { self.valore = valore }
 
-    func leggi(per server: URL) -> String? { lucchetto.withLock { valore } }
-    func salva(_ v: String, per server: URL) { lucchetto.withLock { valore = v } }
+    private func conta() {
+        if Thread.isMainThread { lucchetto.withLock { _sulThreadPrincipale += 1 } }
+    }
+
+    func leggi(per server: URL) -> String? {
+        conta()
+        return lucchetto.withLock { valore }
+    }
+
+    func salva(_ v: String, per server: URL) {
+        conta()
+        lucchetto.withLock { valore = v }
+    }
+
     func elimina(per server: URL) {
+        conta()
         lucchetto.withLock {
             valore = nil
-            eliminato = true
+            _eliminato = true
         }
     }
+}
+
+/// Un Portachiavi che, come quando macOS chiede il permesso, risponde solo
+/// quando il test lo sblocca (al massimo dopo 5 secondi).
+final class DepositoInAttesa: DepositoToken, @unchecked Sendable {
+    let interno: DepositoFinto
+    private let permesso = DispatchSemaphore(value: 0)
+    private let lucchetto = NSLock()
+    private var _letture = 0
+    var letture: Int { lucchetto.withLock { _letture } }
+
+    init(_ valore: String?) { interno = DepositoFinto(valore) }
+
+    func consenti() { permesso.signal() }
+
+    func leggi(per server: URL) -> String? {
+        lucchetto.withLock { _letture += 1 }
+        _ = permesso.wait(timeout: .now() + 5)
+        return interno.leggi(per: server)
+    }
+
+    func salva(_ v: String, per server: URL) { interno.salva(v, per: server) }
+    func elimina(per server: URL) { interno.elimina(per: server) }
 }
 
 /// Le attese chieste dal connettore, per controllarne la durata.
@@ -179,7 +237,7 @@ struct CicloTests {
         ReteFinta.prepara(Finti.regole(token: { n in n <= 2 ? .senzaRete : .http(200, Finti.token(1)) }))
         let deposito = DepositoFinto("r0")
         let c = connettore(deposito, attese: Attese())
-        c.avvia()
+        await c.avvia()
         try await finche { c.lavoriOggi == 1 }
         #expect(ReteFinta.volte("/oauth/token") == 3)
         #expect(ReteFinta.volte("/lavori/l1/risultato") == 1)
@@ -194,7 +252,7 @@ struct CicloTests {
         let deposito = DepositoFinto("r0")
         let attese = Attese()
         let c = connettore(deposito, attese: attese)
-        c.avvia()
+        await c.avvia()
         try await finche { ReteFinta.volte("/oauth/token") >= 4 }
         #expect(deposito.leggi(per: c.server) == "r0")
         #expect(!deposito.eliminato)
@@ -213,7 +271,7 @@ struct CicloTests {
         ReteFinta.prepara(Finti.regole(token: { _ in .http(400, #"{"error":"invalid_grant","error_description":"Collegamento revocato"}"#) }))
         let deposito = DepositoFinto("r0")
         let c = connettore(deposito, attese: Attese())
-        c.avvia()
+        await c.avvia()
         try await finche { deposito.eliminato }
         #expect(deposito.leggi(per: c.server) == nil)
         #expect(c.stato == .errore(ErroreServer.scollegato.localizedDescription))
@@ -232,7 +290,7 @@ struct CicloTests {
         ReteFinta.prepara(r)
         let deposito = DepositoFinto("r0")
         let c = connettore(deposito, attese: Attese())
-        c.avvia()
+        await c.avvia()
         try await finche { c.lavoriOggi == 1 }
         #expect(ReteFinta.volte("/oauth/token") == 2)
         #expect(deposito.leggi(per: c.server) == "r2")
@@ -244,7 +302,7 @@ struct CicloTests {
         ReteFinta.prepara(Finti.regole(token: { _ in .http(200, Finti.token(1)) }, ritardoAnalisi: 0.3))
         let attese = Attese()
         let c = connettore(DepositoFinto("r0"), attese: attese)
-        c.avvia()
+        await c.avvia()
         try await finche { c.lavoriOggi == 1 }
         #expect(ReteFinta.volte("/lavori/l1/proroga") >= 1)
         #expect(attese.tutte.contains(60))
@@ -260,12 +318,55 @@ struct CicloTests {
         let c = Connettore(ollama: OllamaClient(sessione: sessione), sessione: sessione, deposito: DepositoFinto("r0"), impostazioni: UserDefaults(suiteName: "prova-\(UUID().uuidString)")!)
         c.server = URL(string: "https://app.example.org")!
         c.pausaConBatteria = false
-        c.avvia()
+        await c.avvia()
         try await finche { ReteFinta.volte("/lavori") == 1 }
         try await Task.sleep(nanoseconds: 100_000_000)
         #expect(ReteFinta.volte("/lavori") == 1)
         c.risvegliato()
         try await finche { ReteFinta.volte("/lavori") == 2 }
         c.scollega()
+    }
+
+    @Test func ilPortachiaviNonSiUsaSulThreadPrincipale() async throws {
+        // macOS può fermare una lettura del Portachiavi finché l'utente non dà il permesso:
+        // sul thread principale l'icona e il menu non comparirebbero.
+        ReteFinta.prepara(Finti.regole(token: { n in .http(200, Finti.token(n)) }))
+        let deposito = DepositoFinto("r0")
+        let c = connettore(deposito, attese: Attese())
+        await c.avvia()
+        try await finche { c.lavoriOggi == 1 }
+        c.scollega()
+        try await finche { deposito.eliminato }
+        #expect(deposito.sulThreadPrincipale == 0)
+    }
+
+    @Test func mentreIlPortachiaviAspettaIlConnettoreRisponde() async throws {
+        ReteFinta.prepara(Finti.regole(token: { n in .http(200, Finti.token(n)) }))
+        let deposito = DepositoInAttesa("r0")
+        let sessione = ReteFinta.sessione()
+        let c = Connettore(ollama: OllamaClient(sessione: sessione), sessione: sessione, deposito: deposito, impostazioni: UserDefaults(suiteName: "prova-\(UUID().uuidString)")!, attendi: { await Attese().attendi($0) })
+        c.server = URL(string: "https://app.example.org")!
+        c.pausaConBatteria = false
+        let avvio = Task { await c.avvia() }
+        // Il thread principale non è fermo: lo stato si legge e dice "Avvio".
+        try await finche { c.stato == .avvio }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(c.stato == .avvio)
+        #expect(ReteFinta.totale == 0)
+        deposito.consenti()
+        #expect(await avvio.value)
+        try await finche { c.lavoriOggi == 1 }
+        // Il refresh token si legge una volta sola, poi si scrive soltanto.
+        #expect(deposito.letture == 1)
+        #expect(deposito.interno.leggi(per: c.server) == "r1")
+        c.scollega()
+    }
+
+    @Test func senzaCollegamentoSalvatoAvviaDiceDiNo() async throws {
+        ReteFinta.prepara(Finti.regole(token: { n in .http(200, Finti.token(n)) }))
+        let c = connettore(DepositoFinto(nil), attese: Attese())
+        #expect(await c.avvia() == false)
+        #expect(c.stato == .scollegato)
+        #expect(ReteFinta.totale == 0)
     }
 }

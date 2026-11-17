@@ -276,10 +276,11 @@ Nuova cartella `connettore-mac/` nel repo: progetto Xcode, SwiftUI, licenza AGPL
 - Durata, `prompt_eval_count` ed `eval_count` dalla risposta di Ollama finiscono nel risultato.
 - `proroga` ogni 60 secondi; timeout del lavoro 4 minuti, poi `errore: timeout`;
 - il ciclo si ferma solo se il server rifiuta il refresh token (`invalid_grant` e simili: il Mac si scollega). Rete assente o server che non risponde lasciano il refresh token nel Portachiavi: si mostra l'errore e si riprova dopo l'intervallo (un rinnovo fallito per la rete si riprova una volta dopo 3 secondi). Un rinnovo alla volta. Al risveglio del Mac (`NSWorkspace.didWakeNotification`) un giro subito.
+- Portachiavi mai sul thread principale: macOS può fermare una lettura finché l'utente non dà il permesso (succede dopo ogni nuova versione firmata ad hoc), e sul thread principale l'icona e il menu non comparirebbero. Letture e scritture passano da una coda seriale, nell'ordine; il refresh token si legge una volta all'avvio (stato "Avvio" nel menu, icona a clessidra) e poi si scrive soltanto.
 - Durante un lavoro: `ProcessInfo.beginActivity` per evitare App Nap e la sospensione per inattività; nessuna attività tra un lavoro e l'altro.
 - Batteria: con il Mac a batteria sotto il 20%, il connettore smette di chiedere lavori (impostazione predefinita, modificabile).
 
-**Menu:** stato (Pronto · Analizza "Scontrino farmacia" · In pausa · Ollama non risponde · Scollegato), lavori di oggi, "Pausa per 1 ora", "Impostazioni", "Esci".
+**Menu:** stato (Avvio · Pronto · Analizza "Scontrino farmacia" · In pausa · Ollama non risponde · Scollegato), lavori di oggi, "Pausa per 1 ora", "Impostazioni", "Esci".
 
 **Riservatezza sul Mac:**
 

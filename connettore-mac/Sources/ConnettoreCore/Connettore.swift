@@ -5,6 +5,7 @@ import os
 
 /// Stato del connettore, per il menu.
 public enum Stato: Equatable, Sendable {
+    case avvio
     case scollegato
     case abbinamento(codice: String, link: String)
     case pronto
@@ -16,6 +17,7 @@ public enum Stato: Equatable, Sendable {
 
     public var descrizione: String {
         switch self {
+        case .avvio: "Avvio: lettura del collegamento dal Portachiavi"
         case .scollegato: "Scollegato"
         case let .abbinamento(codice, _): "In attesa di approvazione (\(codice))"
         case .pronto: "Pronto"
@@ -69,6 +71,12 @@ public final class Connettore: ObservableObject {
     private var giornoContato = Calendar.current.startOfDay(for: Date())
     private var attesa: Task<Void, Never>?
     private var rinnovoInCorso: Task<Void, Error>?
+    /// Il refresh token letto all'avvio: dopo, il Portachiavi si scrive ma non si rilegge.
+    private var refresh: (server: URL, valore: String)?
+    /// Il Portachiavi può fermarsi a lungo: macOS chiede il permesso all'utente, per
+    /// esempio dopo un aggiornamento dell'app. Mai sul thread principale, che disegna
+    /// icona e menu; un'operazione alla volta, nell'ordine in cui arrivano.
+    private let codaDeposito = DispatchQueue(label: "it.cartellaviva.connettore.deposito")
 
     public init(ollama: OllamaClient = OllamaClient(), sessione: URLSession = .shared, deposito: any DepositoToken = DepositoPortachiavi(), impostazioni: UserDefaults = .standard, attendi: @escaping @Sendable (TimeInterval) async -> Void = Connettore.dorme) {
         self.ollama = ollama
@@ -82,16 +90,33 @@ public final class Connettore: ObservableObject {
 
     var client: ServerClient { ServerClient(base: server, sessione: sessione) }
 
-    /// C'è un collegamento salvato su questo Mac?
-    public var collegato: Bool { deposito.leggi(per: server) != nil }
-
     /// All'avvio: se c'è un collegamento salvato, si riparte da lì.
-    public func avvia() {
-        guard collegato else {
+    /// False se questo Mac non è collegato a una famiglia.
+    @discardableResult
+    public func avvia() async -> Bool {
+        stato = .avvio
+        let s = server
+        let salvato = await nelDeposito { $0.leggi(per: s) }
+        // Nel frattempo l'utente ha già fatto altro (per esempio un nuovo collegamento).
+        guard stato == .avvio else { return refresh != nil }
+        guard let salvato else {
             stato = .scollegato
-            return
+            return false
         }
+        refresh = (s, salvato)
         avviaCiclo()
+        return true
+    }
+
+    private func nelDeposito<T: Sendable>(_ f: @escaping @Sendable (any DepositoToken) -> T) async -> T {
+        let d = deposito
+        return await withCheckedContinuation { c in codaDeposito.async { c.resume(returning: f(d)) } }
+    }
+
+    /// Una scrittura nel Portachiavi senza aspettarla: la coda la fa dopo quelle già chieste.
+    private func scriviNelDeposito(_ f: @escaping @Sendable (any DepositoToken) -> Void) {
+        let d = deposito
+        codaDeposito.async { f(d) }
     }
 
     // MARK: Abbinamento
@@ -137,7 +162,9 @@ public final class Connettore: ObservableObject {
     /// Dimentica il collegamento su questo Mac (per scollegarlo dalla famiglia, usare l'app).
     public func scollega() {
         ciclo?.cancel()
-        deposito.elimina(per: server)
+        let s = server
+        scriviNelDeposito { $0.elimina(per: s) }
+        refresh = nil
         token = nil
         famiglia = nil
         stato = .scollegato
@@ -320,14 +347,14 @@ public final class Connettore: ObservableObject {
     /// - Rete o server che non rispondono: il refresh token resta dov'è, si riprova
     ///   una volta dopo qualche secondo e poi si lascia l'errore al ciclo.
     private func rinnovaOra() async throws {
-        guard let refresh = deposito.leggi(per: server) else {
+        guard let refresh, refresh.server == server else {
             scollega()
             throw ErroreServer.scollegato
         }
         var tentativi = 0
         while true {
             do {
-                salva(try await client.rinnova(refreshToken: refresh))
+                salva(try await client.rinnova(refreshToken: refresh.valore))
                 return
             } catch is ErroreOAuth {
                 scollega()
@@ -347,7 +374,9 @@ public final class Connettore: ObservableObject {
     private func salva(_ t: Token) {
         token = t.accessToken
         tokenScadeIl = Date().addingTimeInterval(TimeInterval(t.expiresIn))
-        deposito.salva(t.refreshToken, per: server)
+        let s = server
+        refresh = (s, t.refreshToken)
+        scriviNelDeposito { $0.salva(t.refreshToken, per: s) }
     }
 
     // MARK: Il Mac
