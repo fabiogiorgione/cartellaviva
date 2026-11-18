@@ -62,31 +62,15 @@ final class AiEstrattoreDati
 
     public function estrai(string $nomeFile, string $testo): DatiEstratti
     {
-        $testo = mb_substr(trim($testo), 0, $this->maxChars);
-        $date = \array_slice(self::dateNelTesto($testo), 0, 15);
-        $elenco = [] === $date ? '(nessuna)' : implode("\n", array_map(static fn (string $d) => '- '.$d, $date));
-        $stringa = static fn (int $max) => ['type' => 'string', 'maxLength' => $max];
-
+        $r = $this->richiesta($nomeFile, $testo);
         $response = $this->httpClient->request('POST', rtrim($this->url, '/').'/api/chat', ['timeout' => 300, 'max_duration' => 600, 'json' => [
             'model' => $this->model,
             'stream' => false,
-            'format' => [
-                'type' => 'object',
-                'properties' => [
-                    'emittente' => $stringa(80),
-                    'data' => ['type' => 'string', 'enum' => [...$date, '']],
-                    'importo' => $stringa(20),
-                    'numero' => $stringa(40),
-                    'intestatario' => $stringa(80),
-                    'riferimenti' => ['type' => 'array', 'items' => $stringa(40), 'maxItems' => 5],
-                    'tag' => ['type' => 'array', 'items' => $stringa(30), 'maxItems' => 5],
-                ],
-                'required' => ['emittente', 'data', 'importo', 'numero', 'intestatario', 'riferimenti', 'tag'],
-            ],
+            'format' => json_decode($r['schema'], true, 512, \JSON_THROW_ON_ERROR),
             'options' => ['temperature' => 0],
             'messages' => [
-                ['role' => 'system', 'content' => self::SYSTEM],
-                ['role' => 'user', 'content' => "Date trovate nel testo:\n{$elenco}\n\nNome file: {$nomeFile}\n\nTesto OCR:\n<<<\n{$testo}\n>>>"],
+                ['role' => 'system', 'content' => $r['istruzioni']],
+                ['role' => 'user', 'content' => $r['prompt']],
             ],
         ]]);
         if (404 === $response->getStatusCode()) {
@@ -96,10 +80,55 @@ final class AiEstrattoreDati
             // Eccezione: Messenger ritenta il messaggio (es. Ollama spento o lento).
             throw new \RuntimeException(sprintf('Ollama ha risposto HTTP %d: %s', $response->getStatusCode(), mb_substr($response->getContent(false), 0, 200)));
         }
-        $r = json_decode((string) ($response->toArray()['message']['content'] ?? ''), true);
+
+        return $this->interpreta((string) ($response->toArray()['message']['content'] ?? ''), $testo);
+    }
+
+    /**
+     * La richiesta al modello, la stessa per Ollama sul server e per il connettore
+     * sul Mac: istruzioni, prompt con il testo (entro il massimo) e schema JSON.
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    public function richiesta(string $nomeFile, string $testo): array
+    {
+        $testo = $this->taglia($testo);
+        $date = self::dateUtili($testo);
+        $elenco = [] === $date ? '(nessuna)' : implode("\n", array_map(static fn (string $d) => '- '.$d, $date));
+        $stringa = static fn (int $max) => ['type' => 'string', 'maxLength' => $max];
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'emittente' => $stringa(80),
+                'data' => ['type' => 'string', 'enum' => [...$date, '']],
+                'importo' => $stringa(20),
+                'numero' => $stringa(40),
+                'intestatario' => $stringa(80),
+                'riferimenti' => ['type' => 'array', 'items' => $stringa(40), 'maxItems' => 5],
+                'tag' => ['type' => 'array', 'items' => $stringa(30), 'maxItems' => 5],
+            ],
+            'required' => ['emittente', 'data', 'importo', 'numero', 'intestatario', 'riferimenti', 'tag'],
+        ];
+
+        return [
+            'istruzioni' => self::SYSTEM,
+            'prompt' => "Date trovate nel testo:\n{$elenco}\n\nNome file: {$nomeFile}\n\nTesto OCR:\n<<<\n{$testo}\n>>>",
+            'schema' => json_encode($schema, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
+        ];
+    }
+
+    /**
+     * La risposta del modello (dal server o dal Mac), ricontrollata sul testo del
+     * documento: vale solo ciò che compare nel testo inviato al modello.
+     */
+    public function interpreta(string $risposta, string $testo): DatiEstratti
+    {
+        $testo = $this->taglia($testo);
+        $r = json_decode($risposta, true);
         if (!\is_array($r)) {
             return new DatiEstratti();
         }
+        $date = self::dateUtili($testo);
 
         return new DatiEstratti(
             emittente: self::nome($r['emittente'] ?? null, $testo),
@@ -110,6 +139,17 @@ final class AiEstrattoreDati
             tag: self::tag($r['tag'] ?? null),
             riferimenti: self::riferimenti($r['riferimenti'] ?? null, $testo),
         );
+    }
+
+    private function taglia(string $testo): string
+    {
+        return mb_substr(trim($testo), 0, $this->maxChars);
+    }
+
+    /** @return list<string> le date tra cui il modello sceglie (al massimo 15) */
+    private static function dateUtili(string $testo): array
+    {
+        return \array_slice(self::dateNelTesto($testo), 0, 15);
     }
 
     /**

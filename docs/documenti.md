@@ -147,6 +147,8 @@ Solo per i documenti **non cifrati**: dati estratti e vettori rivelano il conten
 2. `SuddivisoreTesto` divide il testo in parti (fino a 8 da 1500 caratteri) e `OllamaEmbedder` ne calcola i vettori con `OLLAMA_EMBED_MODEL` (consigliato `bge-m3`, multilingue, ~1,2 GB, meno di 2 GB di RAM).
 3. Prima di salvare si ricontrolla, con il documento bloccato, che non sia stato cifrato nel frattempo.
 
+Con il Mac della famiglia collegato e acceso, il punto 1 lo fa il Mac e il server fa solo i vettori ([connettore-ai.md](connettore-ai.md), "Analisi del testo").
+
 Se Ollama non risponde, Messenger ritenta. Se un modello non è scaricato (HTTP 404) quella parte si salta senza ritentare. Nell'audit (`documento.indicizzato`) ci sono solo i modelli e il numero di parti, mai i dati estratti.
 
 **Tabelle.** `documento_indice` (dati, tag, riferimenti) e `documento_embedding` (un vettore per parte) usano l'estensione **pgvector**: il servizio `database` è `postgres:16-alpine` con pgvector compilato (`docker/database/Dockerfile`, versione fissata). Sono gestite con SQL diretto (`Indice\IndiceDocumenti`) ed escluse dal confronto dello schema dell'ORM (`schema_filter` in `doctrine.yaml`). Nessun indice HNSW: si cerca sempre dentro una famiglia, dove la ricerca esatta è veloce e non perde risultati.

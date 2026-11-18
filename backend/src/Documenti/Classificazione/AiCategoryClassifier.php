@@ -87,6 +87,39 @@ final class AiCategoryClassifier implements ClassifierInterface
 
     public function classify(string $nomeFile, string $testo, array $categorie, array $esempi = [], array $indizi = []): ClassificationResult
     {
+        return $this->interpretaClassifica($this->chat($this->richiestaClassifica($nomeFile, $testo, $categorie, $esempi, $indizi)), $categorie, $this->model);
+    }
+
+    public function proponiNuova(string $nomeFile, string $testo, array $indizi, array $esistenti): ?NuovaCategoria
+    {
+        return $this->interpretaNuova($this->chat($this->richiestaNuova($nomeFile, $testo, $indizi, $esistenti)), $esistenti, $this->model);
+    }
+
+    public function descriviCategoria(string $categoria, array $esempi): string
+    {
+        return $this->interpretaDescrizione($this->chat($this->richiestaDescrizione($categoria, $esempi)), $categoria);
+    }
+
+    public function verifica(string $nomeFile, string $testo, string $categoria, string $descrizione, array $indizi): bool
+    {
+        return $this->interpretaVerifica($this->chat($this->richiestaVerifica($nomeFile, $testo, $categoria, $descrizione, $indizi)));
+    }
+
+    /*
+     * Ogni domanda in due metodi: la richiesta (istruzioni, prompt, schema JSON) e
+     * l'interpretazione della risposta. Li usa anche il connettore sul Mac
+     * (ConnettoreAi\ClassificatoreSulMac): stessa domanda e stessi controlli.
+     */
+
+    /**
+     * @param list<string>                $categorie
+     * @param array<string, list<string>> $esempi
+     * @param list<string>                $indizi
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    public function richiestaClassifica(string $nomeFile, string $testo, array $categorie, array $esempi = [], array $indizi = []): array
+    {
         $categorie = array_values(array_unique($categorie));
         $elenco = implode("\n", array_map(static function (string $c) use ($esempi): string {
             $titoli = \array_slice($esempi[$c] ?? [], 0, 3);
@@ -94,20 +127,31 @@ final class AiCategoryClassifier implements ClassifierInterface
             return '- '.$c.([] === $titoli ? '' : ' (vi si trovano già, ad esempio: '.implode('; ', array_map(static fn (string $t) => '"'.mb_substr($t, 0, 60).'"', $titoli)).')');
         }, $categorie));
 
-        $raw = $this->chat(self::SYSTEM, "Categorie:\n{$elenco}\n\n".$this->documento($nomeFile, $testo, $indizi), [
+        return self::richiesta(self::SYSTEM, "Categorie:\n{$elenco}\n\n".$this->documento($nomeFile, $testo, $indizi), [
             'type' => 'object',
             'properties' => ['categoria' => ['type' => 'string', 'enum' => [...$categorie, self::NESSUNA]]],
             'required' => ['categoria'],
         ]);
-
-        return new ClassificationResult($this->validate($raw, $categorie), mb_substr($raw, 0, 200), $this->model);
     }
 
-    public function proponiNuova(string $nomeFile, string $testo, array $indizi, array $esistenti): ?NuovaCategoria
+    /** @param list<string> $categorie */
+    public function interpretaClassifica(string $raw, array $categorie, string $modello): ClassificationResult
+    {
+        return new ClassificationResult($this->validate($raw, array_values(array_unique($categorie))), mb_substr($raw, 0, 200), $modello);
+    }
+
+    /**
+     * @param list<string> $indizi
+     * @param list<string> $esistenti
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    public function richiestaNuova(string $nomeFile, string $testo, array $indizi, array $esistenti): array
     {
         $elenco = [] === $esistenti ? '(nessuna)' : implode("\n", array_map(static fn (string $c) => '- '.$c, $esistenti));
+
         // Il modello scrive i campi in ordine alfabetico: "simbolo" dopo "nome", così l'icona segue il nome.
-        $raw = $this->chat(self::SYSTEM_NUOVA, "Categorie esistenti (non adatte):\n{$elenco}\n\n".$this->documento($nomeFile, $testo, $indizi, self::MAX_CHARS_BREVE), [
+        return self::richiesta(self::SYSTEM_NUOVA, "Categorie esistenti (non adatte):\n{$elenco}\n\n".$this->documento($nomeFile, $testo, $indizi, self::MAX_CHARS_BREVE), [
             'type' => 'object',
             'properties' => [
                 'nome' => ['type' => 'string', 'maxLength' => NuovaCategoria::MAX_NOME],
@@ -116,6 +160,11 @@ final class AiCategoryClassifier implements ClassifierInterface
             ],
             'required' => ['nome', 'sensibile', 'simbolo'],
         ]);
+    }
+
+    /** @param list<string> $esistenti */
+    public function interpretaNuova(string $raw, array $esistenti, string $modello): ?NuovaCategoria
+    {
         $r = json_decode($raw, true);
         $nome = \is_array($r) ? NuovaCategoria::normalizzaNome($r['nome'] ?? null) : null;
         if (null === $nome) {
@@ -128,33 +177,62 @@ final class AiCategoryClassifier implements ClassifierInterface
         }
         $icona = \is_string($r['simbolo'] ?? null) && \in_array($r['simbolo'], NuovaCategoria::ICONE, true) ? $r['simbolo'] : 'folder';
 
-        return new NuovaCategoria($nome, true === ($r['sensibile'] ?? null), $icona, $this->model);
+        return new NuovaCategoria($nome, true === ($r['sensibile'] ?? null), $icona, $modello);
     }
 
-    public function descriviCategoria(string $categoria, array $esempi): string
+    /**
+     * @param list<string> $esempi
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    public function richiestaDescrizione(string $categoria, array $esempi): array
     {
         $titoli = \array_slice($esempi, 0, 3);
-        $raw = $this->chat(self::SYSTEM_DESCRIZIONE, "Categoria: {$categoria}\nTitoli: ".([] === $titoli ? '(nessuno)' : implode('; ', array_map(static fn (string $t) => mb_substr($t, 0, 60), $titoli))), [
+
+        return self::richiesta(self::SYSTEM_DESCRIZIONE, "Categoria: {$categoria}\nTitoli: ".([] === $titoli ? '(nessuno)' : implode('; ', array_map(static fn (string $t) => mb_substr($t, 0, 60), $titoli))), [
             'type' => 'object',
             'properties' => ['descrizione' => ['type' => 'string', 'maxLength' => 200]],
             'required' => ['descrizione'],
         ]);
+    }
+
+    public function interpretaDescrizione(string $raw, string $categoria): string
+    {
         $r = json_decode($raw, true);
         $descrizione = \is_array($r) && \is_string($r['descrizione'] ?? null) ? trim((string) preg_replace('/\s+/u', ' ', $r['descrizione'])) : '';
 
         return '' === $descrizione ? $categoria : mb_substr($descrizione, 0, 200);
     }
 
-    public function verifica(string $nomeFile, string $testo, string $categoria, string $descrizione, array $indizi): bool
+    /**
+     * @param list<string> $indizi
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    public function richiestaVerifica(string $nomeFile, string $testo, string $categoria, string $descrizione, array $indizi): array
     {
-        $raw = $this->chat(self::SYSTEM_VERIFICA, "Categoria: {$categoria}\nRaccoglie: {$descrizione}\n\n".$this->documento($nomeFile, $testo, $indizi, self::MAX_CHARS_BREVE), [
+        return self::richiesta(self::SYSTEM_VERIFICA, "Categoria: {$categoria}\nRaccoglie: {$descrizione}\n\n".$this->documento($nomeFile, $testo, $indizi, self::MAX_CHARS_BREVE), [
             'type' => 'object',
             'properties' => ['argomento' => ['type' => 'string', 'maxLength' => 60], 'giusta' => ['type' => 'boolean']],
             'required' => ['argomento', 'giusta'],
         ]);
+    }
+
+    public function interpretaVerifica(string $raw): bool
+    {
         $r = json_decode($raw, true);
 
         return \is_array($r) && true === ($r['giusta'] ?? null);
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     *
+     * @return array{istruzioni: string, prompt: string, schema: string}
+     */
+    private static function richiesta(string $istruzioni, string $prompt, array $schema): array
+    {
+        return ['istruzioni' => $istruzioni, 'prompt' => $prompt, 'schema' => json_encode($schema, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE)];
     }
 
     /** @param list<string> $indizi */
@@ -166,18 +244,18 @@ final class AiCategoryClassifier implements ClassifierInterface
         return "Nome file: {$nomeFile}\n{$altro}\nTesto OCR:\n<<<\n".('' === $testo ? '(non disponibile: decidi dal nome, solo se è chiaro)' : $testo)."\n>>>";
     }
 
-    /** @param array<string, mixed> $schema */
-    private function chat(string $system, string $user, array $schema): string
+    /** @param array{istruzioni: string, prompt: string, schema: string} $r */
+    private function chat(array $r): string
     {
         // Su CPU un modello da 4B può impiegare decine di secondi: timeout ampio.
         $richiesta = fn () => $this->httpClient->request('POST', rtrim($this->url, '/').'/api/chat', ['timeout' => 300, 'max_duration' => 600, 'json' => [
             'model' => $this->model,
             'stream' => false,
-            'format' => $schema,
+            'format' => json_decode($r['schema'], true, 512, \JSON_THROW_ON_ERROR),
             'options' => ['temperature' => 0],
             'messages' => [
-                ['role' => 'system', 'content' => $system],
-                ['role' => 'user', 'content' => $user],
+                ['role' => 'system', 'content' => $r['istruzioni']],
+                ['role' => 'user', 'content' => $r['prompt']],
             ],
         ]]);
 

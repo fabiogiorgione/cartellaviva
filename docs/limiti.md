@@ -3,13 +3,13 @@
 Questa guida fa parte del manuale tecnico; la presentazione del progetto è nel [README](../README.md).
 
 - **Installazione in proprio (produzione)**: `compose.prod.yaml`, `scripts/installa-server.sh`, `scripts/backup.sh` e `scripts/ripristina.sh`, con la guida [installazione-server.md](installazione-server.md).
-  - il percorso è stato provato da zero su un Mac (`localhost`, certificato interno di Caddy) e poi su un server Linux vero: una VM Azure da 2 vCPU e 8 GB con Let's Encrypt, dove gira l'installazione di collaudo (novembre 2026). Su una macchina così l'AI va tenuta stretta: Ollama al massimo 5 GB, un'analisi alla volta, swap per PHP e worker (`compose.prod.yaml`);
+  - il percorso è stato provato da zero su un Mac (`localhost`, certificato interno di Caddy) e poi su un server Linux vero: una VM Azure da 2 vCPU e 8 GB con Let's Encrypt, dove gira l'installazione di collaudo (novembre 2026). Su una macchina così l'AI va tenuta stretta: Ollama al massimo 5 GB, un modello e un'analisi alla volta, swap per PHP e worker (`compose.prod.yaml`);
   - una sola macchina con Docker Compose: niente alta disponibilità, e i backup vanno copiati fuori dal server a mano o con un proprio cron;
   - `compose.yaml` resta solo per lo sviluppo (codice montato, Mailpit, password del database predefinita);
   - l'app Android in release è firmata con la chiave di debug (`frontend/android/app/build.gradle.kts`): per distribuirla serve la propria chiave;
   - l'app per Mac (`connettore-mac/`) è firmata ad hoc: per distribuirla fuori dal proprio Mac servono un Developer ID e la notarizzazione Apple; mancano anche aggiornamenti automatici, icona e installer.
 - **Test**:
-  - backend: 317 test al 17/11/2026 (frontend 129, connettore Mac 14); alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
+  - backend: 328 test al 18/11/2026 (frontend 129, connettore Mac 14); alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
   - frontend (misura alla 0.1.0): 110 test, che toccano 89 file su 185 di `frontend/lib` e, di quelli, il 34% delle righe. Le parti meno coperte sono l'account (13%) e il layout (9%).
 - **Analisi statica**: PHPStan è al livello 5, con 51 segnalazioni ancora in `backend/phpstan-baseline.neon`. L'analizzatore di Flutter dà 8 avvisi informativi.
 - **Dipendenze**:

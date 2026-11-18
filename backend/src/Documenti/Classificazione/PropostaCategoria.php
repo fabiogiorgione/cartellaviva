@@ -66,6 +66,21 @@ final class PropostaCategoria
      */
     public function proponi(Documento $documento, array $nuove, array $escludi = []): array
     {
+        return $this->proponiCon($this->classifier, $documento, $nuove, $escludi);
+    }
+
+    /**
+     * Come proponi(), con un altro classificatore: il Mac della famiglia
+     * (ConnettoreAi\LavoriClassificazione). Prima dell'audit finale non c'è nessun
+     * effetto: se il classificatore lancia un'eccezione non resta niente a metà.
+     *
+     * @param list<string> $nuove
+     * @param list<string> $escludi
+     *
+     * @return array{tipo: 'esistente'|'nuova'|'nessuna', categoriaId?: string, nome?: string, sensibile?: bool|null, icona?: string|null, motivo?: string, fonte: 'testo'|'nome'}
+     */
+    public function proponiCon(ClassifierInterface $classifier, Documento $documento, array $nuove, array $escludi = []): array
+    {
         // Non si propongono le categorie "di servizio": in attesa di classificazione e copie consegnate agli enti.
         $candidate = array_values(array_filter($this->categorie->findUsableIn($documento->getTenant()),
             static fn (Categoria $c) => !$c->isDaCategorizzare() && !($c->isSystem() && RisposteService::CATEGORIA === $c->getSlug())));
@@ -88,11 +103,11 @@ final class PropostaCategoria
         if ([] !== $perNome || [] !== $nuove) {
             $nomi = [...array_map(static fn (Categoria $c) => $c->getNome(), array_values($perNome)), ...$nuove];
             $esempi = $this->esempi($documento, $escludi);
-            $result = $this->classifier->classify($documento->getNomeFileOriginale(), $testo, $nomi, $esempi, $indizi);
+            $result = $classifier->classify($documento->getNomeFileOriginale(), $testo, $nomi, $esempi, $indizi);
             $modello = $result->modello;
             $scelta = null === $result->categoria ? null : mb_strtolower($result->categoria);
             // Il modello sceglie quasi sempre qualcosa: una domanda sì/no scarta le scelte forzate.
-            if (null !== $scelta && !$this->classifier->verifica($documento->getNomeFileOriginale(), $testo, (string) $result->categoria, $this->descrizione($result->modello, (string) $result->categoria, $esempi[(string) $result->categoria] ?? []), $indizi)) {
+            if (null !== $scelta && !$classifier->verifica($documento->getNomeFileOriginale(), $testo, (string) $result->categoria, $this->descrizione($classifier, $result->modello, (string) $result->categoria, $esempi[(string) $result->categoria] ?? []), $indizi)) {
                 $scelta = null;
             }
             if (null !== $scelta && isset($perNome[$scelta])) {
@@ -105,7 +120,7 @@ final class PropostaCategoria
         if ('nessuna' === $esito['tipo']) {
             if ('' === $testo) {
                 $esito['motivo'] = 'Il testo del documento non è disponibile e dal nome non si capisce.';
-            } elseif (null !== ($nuova = $this->classifier->proponiNuova($documento->getNomeFileOriginale(), $testo, $indizi, [...array_map(static fn (Categoria $c) => $c->getNome(), array_values($perNome)), ...$nuove]))) {
+            } elseif (null !== ($nuova = $classifier->proponiNuova($documento->getNomeFileOriginale(), $testo, $indizi, [...array_map(static fn (Categoria $c) => $c->getNome(), array_values($perNome)), ...$nuove]))) {
                 $modello = $nuova->modello;
                 $esito = ['tipo' => 'nuova', 'nome' => $nuova->nome, 'sensibile' => $nuova->sensibile, 'icona' => $nuova->icona, 'fonte' => $fonte];
             }
@@ -125,14 +140,14 @@ final class PropostaCategoria
      *
      * @param list<string> $esempi
      */
-    private function descrizione(string $modello, string $categoria, array $esempi): string
+    private function descrizione(ClassifierInterface $classifier, string $modello, string $categoria, array $esempi): string
     {
         $chiave = 'categoria_descrizione_'.hash('xxh128', json_encode([$modello, $categoria, $esempi], \JSON_THROW_ON_ERROR));
 
-        return $this->cache->get($chiave, function (ItemInterface $item) use ($categoria, $esempi): string {
+        return $this->cache->get($chiave, function (ItemInterface $item) use ($classifier, $categoria, $esempi): string {
             $item->expiresAfter(7 * 86400);
 
-            return $this->classifier->descriviCategoria($categoria, $esempi);
+            return $classifier->descriviCategoria($categoria, $esempi);
         });
     }
 

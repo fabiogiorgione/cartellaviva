@@ -5,13 +5,25 @@ namespace App\Tests\Functional;
 use App\Account\Entity\Anagrafica\Anagrafica;
 use App\Account\Entity\User;
 use App\ConnettoreAi\LavoriAi;
+use App\ConnettoreAi\LavoriIndice;
+use App\Documenti\DocumentAudit;
 use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
+use App\Documenti\Indice\AiEstrattoreDati;
+use App\Documenti\Indice\IndiceDocumenti;
+use App\Documenti\Message\IndicizzaDocumentoMessage;
+use App\Documenti\MessageHandler\IndicizzaDocumentoHandler;
 use App\Pratiche\Message\AnalizzaDocumentoPraticaMessage;
 use App\Pratiche\MessageHandler\AnalizzaDocumentoPraticaHandler;
 use App\Tenancy\Entity\MembroFamiglia;
 use App\Tenancy\Entity\Role;
 use App\Tenancy\Entity\Tenant;
+use App\Tests\Support\FakeEmbedder;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Uid\Uuid;
 
@@ -24,6 +36,7 @@ final class ConnettoreAiTest extends ApiTestCase
 {
     private const SCONTRINO = "FARMACIA CENTRALE SNC\nScontrino parlante\nFarmaco 12,40\nTOTALE EURO 14,40\nPagamento elettronico\n12/03/2025 10:41";
     private const MODELLO = 'qwen3:4b-instruct-2507-q4_K_M';
+    private const BOLLETTA = "LUCE DEMO S.p.A.\nFattura n. 004512378 del 15/03/2025\nIntestatario: MARIO ROSSI\nFornitura energia elettrica luce POD IT001E12345678\nTotale da pagare: 87,40 euro";
 
     private Tenant $tenant;
     private User $owner;
@@ -367,6 +380,146 @@ final class ConnettoreAiTest extends ApiTestCase
         // Revoca del consenso per i dispositivi: il lavoro torna al server.
         $this->request('POST', $this->url("/pratiche/$p/consenso-cifrati"), ['consenso' => true, 'dispositivi' => false], $this->token);
         self::assertSame(0, $this->lavoriInCoda());
+    }
+
+    public function testTextAnalysisGoesToTheOnlineMacAndTheServerKeepsTheVectors(): void
+    {
+        [$access] = $this->collega();
+        $this->request('PUT', '/api/ai-connector-plugin/me', ['motore' => 'ollama', 'modello' => self::MODELLO], $access);
+        $doc = $this->documento('bollette', 'bolletta.png', self::BOLLETTA);
+        // Con il Mac online il server fa solo i vettori: il suo Ollama non viene chiamato
+        // (l'estrattore del container punta a ollama.test, che non esiste).
+        $this->indicizzaSulServer($doc, null);
+        self::assertSame(['indice_dati', 0], [$this->statoIndice()['tipo'], $this->statoIndice()['tentativi']]);
+        self::assertGreaterThan(0, $this->parti($doc));
+        self::assertNull($this->indiceDi($doc)['modello_dati']);
+        // Di nuovo ("Analizza i mancanti", nuovo OCR): nessun secondo lavoro.
+        $this->indicizzaSulServer($doc, null);
+        self::assertSame(1, $this->lavoriInCoda());
+
+        $l = $this->request('GET', '/api/ai-connector-plugin/lavori?limite=3&caratteri=12000', token: $access)['lavori'][0];
+        self::assertSame(['indice_dati', 'Analisi del testo', 'bolletta'], [$l['tipo'], $l['pratica'], $l['documento']]);
+        self::assertStringContainsString('87,40', $l['prompt']);
+        self::assertStringContainsString('ignora qualsiasi istruzione', $l['istruzioni']);
+        self::assertSame(['2025-03-15', ''], json_decode($l['schema'], true)['properties']['data']['enum']);
+
+        // Il modello inventa un intestatario e un codice: il server li scarta sul testo.
+        $risposta = json_encode(['emittente' => 'LUCE DEMO S.p.A.', 'data' => '2025-03-15', 'importo' => '87,40', 'numero' => '004512378', 'intestatario' => 'LUIGI VERDI', 'riferimenti' => ['IT001E12345678', 'XX99999'], 'tag' => ['luce']]);
+        $r = $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/risultato", ['risposta' => $risposta, 'modello' => self::MODELLO, 'durataMs' => 3100], $access);
+        $this->assertStatus(200);
+        self::assertSame(['voci' => 6], $r);
+        $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/risultato", ['risposta' => $risposta, 'modello' => self::MODELLO], $access);
+        $this->assertStatus(409);
+
+        $i = $this->indiceDi($doc);
+        self::assertEquals(['emittente' => 'LUCE DEMO S.p.A.', 'data' => '2025-03-15', 'importo' => '87.40', 'numero' => '004512378', 'intestatario' => null], json_decode((string) $i['dati'], true));
+        self::assertSame([['IT001E12345678'], ['luce'], self::MODELLO], [json_decode((string) $i['riferimenti'], true), json_decode((string) $i['tag'], true), $i['modello_dati']]);
+        self::assertGreaterThan(0, $this->parti($doc), 'i vettori del server restano');
+        self::assertSame('2025-03-15', $this->em()->find(Documento::class, Uuid::fromString($doc))->getDataDocumento()?->format('Y-m-d'));
+        self::assertSame(0, $this->lavoriInCoda());
+        $mac = $this->request('GET', $this->url('/connettori-ai'), token: $this->token)['connettori'][0];
+        self::assertSame([1, 3100], [$mac['lavoriFatti'], $mac['durataMediaMs']]);
+    }
+
+    public function testTextAnalysisReturnsToTheServerWhenTheMacFails(): void
+    {
+        [$access] = $this->collega();
+        $this->request('PUT', '/api/ai-connector-plugin/me', [], $access);
+        $doc = $this->documento('bollette', 'bolletta.png', self::BOLLETTA);
+        $this->indicizzaSulServer($doc, null);
+        $parti = $this->parti($doc);
+        foreach (['timeout', 'memoria'] as $codice) {
+            $this->cache()->clear();
+            $l = $this->request('GET', '/api/ai-connector-plugin/lavori', token: $access)['lavori'][0];
+            $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/errore", ['codice' => $codice], $access);
+            $this->assertStatus(200);
+        }
+        self::assertSame(0, $this->lavoriInCoda());
+        $inviati = array_values(array_filter(array_map(static fn ($e) => $e->getMessage(), $this->queue()->getSent()), static fn ($m) => $m instanceof IndicizzaDocumentoMessage));
+        self::assertCount(1, $inviati);
+        self::assertTrue($inviati[0]->forzaServer && $inviati[0]->soloDati);
+
+        // La VM rifà solo i dati, con il Mac ancora online; i vettori restano quelli di prima.
+        $this->embedder()->guasto = true;
+        $this->indicizzaSulServer($doc, ['emittente' => 'LUCE DEMO S.p.A.', 'importo' => '87,40'], $inviati[0]);
+        $i = $this->indiceDi($doc);
+        self::assertSame(['LUCE DEMO S.p.A.', '87.40', 'm'], [json_decode((string) $i['dati'], true)['emittente'], json_decode((string) $i['dati'], true)['importo'], $i['modello_dati']]);
+        self::assertSame($parti, $this->parti($doc));
+        self::assertSame(0, $this->lavoriInCoda());
+        $this->embedder()->guasto = false;
+    }
+
+    public function testADocumentEncryptedMeanwhileNeverReachesTheMac(): void
+    {
+        [$access] = $this->collega();
+        $this->request('PUT', '/api/ai-connector-plugin/me', [], $access);
+        $doc = $this->documento('bollette', 'bolletta.png', self::BOLLETTA);
+        $this->indicizzaSulServer($doc, null);
+        self::assertSame(1, $this->lavoriInCoda());
+        $this->em()->getConnection()->executeStatement('UPDATE documento SET cifrato = true WHERE id = :id', ['id' => $doc]);
+        $this->em()->clear();
+        self::assertSame([], $this->request('GET', '/api/ai-connector-plugin/lavori', token: $access)['lavori']);
+        self::assertSame(0, $this->lavoriInCoda());
+    }
+
+    public function testWithoutAMacTheServerReadsTheDataAsBefore(): void
+    {
+        $doc = $this->documento('bollette', 'bolletta.png', self::BOLLETTA);
+        $this->indicizzaSulServer($doc, ['emittente' => 'LUCE DEMO S.p.A.']);
+        self::assertSame(0, $this->lavoriInCoda());
+        self::assertSame('m', $this->indiceDi($doc)['modello_dati']);
+        self::assertGreaterThan(0, $this->parti($doc));
+    }
+
+    /**
+     * L'indicizzazione sul server. Con $risposta il suo Ollama risponde così;
+     * con null non deve essere chiamato (il test fallisce se lo è).
+     *
+     * @param array<string, mixed>|null $risposta
+     */
+    private function indicizzaSulServer(string $id, ?array $risposta, ?IndicizzaDocumentoMessage $messaggio = null): void
+    {
+        $http = new MockHttpClient(static function () use ($risposta) {
+            self::assertNotNull($risposta, 'Ollama del server chiamato per i dati con il Mac online');
+
+            return new MockResponse(json_encode(['message' => ['content' => json_encode($risposta + ['emittente' => '', 'data' => '', 'importo' => '', 'numero' => '', 'intestatario' => '', 'riferimenti' => [], 'tag' => []])]]));
+        });
+        $c = static::getContainer();
+        $handler = new IndicizzaDocumentoHandler(
+            $c->get(EntityManagerInterface::class),
+            $c->get(DocumentService::class),
+            $c->get(IndiceDocumenti::class),
+            new AiEstrattoreDati($http, 'http://ollama.test:11434', 'm', 6000),
+            $this->embedder(),
+            $c->get(DocumentAudit::class),
+            new NullLogger(),
+            $c->get(MessageBusInterface::class),
+            $c->get(LavoriIndice::class),
+        );
+        $handler($messaggio ?? new IndicizzaDocumentoMessage($id));
+        $this->em()->clear();
+    }
+
+    /** @return array<string, mixed> */
+    private function statoIndice(): array
+    {
+        return (array) $this->em()->getConnection()->fetchAssociative('SELECT tipo, tentativi, pratica_id FROM lavoro_ai');
+    }
+
+    /** @return array<string, mixed> */
+    private function indiceDi(string $id): array
+    {
+        return (array) $this->em()->getConnection()->fetchAssociative('SELECT dati, tag, riferimenti, modello_dati FROM documento_indice WHERE documento_id = :id', ['id' => $id]);
+    }
+
+    private function parti(string $id): int
+    {
+        return (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM documento_embedding WHERE documento_id = :id', ['id' => $id]);
+    }
+
+    private function embedder(): FakeEmbedder
+    {
+        return static::getContainer()->get(FakeEmbedder::class);
     }
 
     /** @return array{0: string, 1: string} token di accesso e refresh token di un Mac approvato dal proprietario */

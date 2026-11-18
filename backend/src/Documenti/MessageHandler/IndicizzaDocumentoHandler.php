@@ -2,6 +2,7 @@
 
 namespace App\Documenti\MessageHandler;
 
+use App\ConnettoreAi\LavoriIndice;
 use App\Documenti\DocumentAudit;
 use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
@@ -33,6 +34,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * non riceve l'indice. Se Ollama non risponde l'eccezione risale e Messenger
  * ritenta il messaggio; se un modello non è scaricato quella parte si salta
  * (nessun nuovo tentativo: app:documenti:indicizza la recupera dopo il pull).
+ *
+ * Con il Mac della famiglia online i dati li legge il Mac (LavoriIndice): qui si
+ * fanno solo i vettori e i dati già salvati restano finché arriva la risposta.
+ * Se il Mac non risponde il lavoro torna qui con soloDati.
  */
 #[AsMessageHandler]
 final class IndicizzaDocumentoHandler
@@ -46,6 +51,7 @@ final class IndicizzaDocumentoHandler
         private readonly DocumentAudit $audit,
         private readonly LoggerInterface $logger,
         private readonly MessageBusInterface $bus,
+        private readonly LavoriIndice $lavoriIndice,
     ) {
     }
 
@@ -75,7 +81,9 @@ final class IndicizzaDocumentoHandler
         $modelloDati = null;
         $vettori = [];
         [$tentati, $mancanti] = [0, 0];
-        if ('' !== $testo && $this->estrattore->isEnabled()) {
+        $datiSulMac = '' !== $testo && $this->estrattore->isEnabled() && !$message->forzaServer && !$message->soloDati
+            && $this->lavoriIndice->instrada($documento);
+        if ('' !== $testo && $this->estrattore->isEnabled() && !$datiSulMac) {
             ++$tentati;
             try {
                 $dati = $this->estrattore->estrai($nomeFile, $testo);
@@ -85,7 +93,7 @@ final class IndicizzaDocumentoHandler
                 $this->logger->warning('Indice del documento {id}: dati non estratti ({reason})', ['id' => $message->documentoId, 'reason' => $e->getMessage()]);
             }
         }
-        if ('' !== $testo && $this->embedder->isEnabled()) {
+        if ('' !== $testo && $this->embedder->isEnabled() && !$message->soloDati) {
             ++$tentati;
             try {
                 // Il nome del file dà contesto a ogni parte ("bolletta_enel_marzo.pdf").
@@ -99,16 +107,30 @@ final class IndicizzaDocumentoHandler
         if ($tentati > 0 && $mancanti === $tentati) {
             return; // nessun modello utile scaricato: niente da salvare, si riprova dopo il pull
         }
+        if ($datiSulMac && 0 === $tentati) {
+            return; // niente vettori da fare: tutto il resto arriva dal Mac
+        }
+        if ($message->soloDati) {
+            if ($tentati > 0 && $this->lavoriIndice->salvaDati($documento, $dati, $modelloDati)) {
+                $this->audit->write($documento, 'documento.indicizzato', ['modello_dati' => $modelloDati]);
+            }
+
+            return;
+        }
 
         $salvato = false;
-        $this->documents->aggiornaBloccato($documento, function (Documento $d) use ($dati, $modelloDati, $vettori, &$salvato): void {
+        $this->documents->aggiornaBloccato($documento, function (Documento $d) use ($dati, $modelloDati, $vettori, $datiSulMac, &$salvato): void {
             // Cifrato nel frattempo (es. spostato in una categoria sensibile): niente indice.
             if ($d->isCifrato()) {
                 return;
             }
-            $this->indice->salva($d, $dati, $modelloDati, $this->embedder->modello(), $vettori);
+            if ($datiSulMac) {
+                $this->indice->salvaVettori($d, $this->embedder->modello(), $vettori);
+            } else {
+                $this->indice->salva($d, $dati, $modelloDati, $this->embedder->modello(), $vettori);
+            }
             // Solo se manca: una data inserita a mano non si sovrascrive mai.
-            if (null === $d->getDataDocumento()) {
+            if (!$datiSulMac && null === $d->getDataDocumento()) {
                 $d->setDataDocumento($dati->dataDocumento());
             }
             $salvato = true;

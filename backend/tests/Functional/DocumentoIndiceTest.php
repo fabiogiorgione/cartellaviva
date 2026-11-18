@@ -3,6 +3,7 @@
 namespace App\Tests\Functional;
 
 use App\Account\Entity\User;
+use App\ConnettoreAi\LavoriIndice;
 use App\Documenti\DocumentAudit;
 use App\Documenti\DocumentService;
 use App\Documenti\Entity\Documento;
@@ -342,6 +343,7 @@ final class DocumentoIndiceTest extends ApiTestCase
             $c->get(DocumentAudit::class),
             new NullLogger(),
             $c->get(MessageBusInterface::class),
+            $c->get(LavoriIndice::class),
         );
         $handler(new IndicizzaDocumentoMessage($id));
     }

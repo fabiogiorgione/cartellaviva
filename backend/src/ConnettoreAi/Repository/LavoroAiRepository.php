@@ -19,6 +19,27 @@ class LavoroAiRepository extends ServiceEntityRepository
         parent::__construct($registry, LavoroAi::class);
     }
 
+    public function perDocumentoIndice(Documento $d): ?LavoroAi
+    {
+        return $this->findOneBy(['documento' => $d, 'tipo' => LavoroAi::INDICE_DATI]);
+    }
+
+    /** Il lavoro senza pratica di questo tipo per il documento (al massimo uno). */
+    public function perDocumento(Documento $d, string $tipo): ?LavoroAi
+    {
+        return $this->findOneBy(['documento' => $d, 'tipo' => $tipo, 'pratica' => null]);
+    }
+
+    /** @return list<LavoroAi> proposte finite o rimandate al server che nessun wizard ha ritirato */
+    public function propostaNonRitirate(\DateTimeImmutable $prima): array
+    {
+        return $this->createQueryBuilder('l')
+            ->andWhere('l.tipo = :t')->setParameter('t', LavoroAi::PROPOSTA_CATEGORIA)
+            ->andWhere('l.stato IN (:s)')->setParameter('s', [LavoroAi::PRONTO, LavoroAi::AL_SERVER])
+            ->andWhere('l.creatoIl < :prima')->setParameter('prima', $prima)
+            ->getQuery()->getResult();
+    }
+
     public function perPraticaDocumento(Pratica $p, Documento $d, string $tipo = LavoroAi::PRATICA_VOCI): ?LavoroAi
     {
         return $this->findOneBy(['pratica' => $p, 'documento' => $d, 'tipo' => $tipo]);

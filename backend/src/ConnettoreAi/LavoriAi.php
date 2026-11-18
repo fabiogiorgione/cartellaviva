@@ -7,6 +7,7 @@ use App\ConnettoreAi\Entity\LavoroAi;
 use App\ConnettoreAi\Repository\ConnettoreAiRepository;
 use App\ConnettoreAi\Repository\LavoroAiRepository;
 use App\Documenti\Entity\Documento;
+use App\Documenti\Message\IndicizzaDocumentoMessage;
 use App\Pratiche\Entity\Pratica;
 use App\Pratiche\Entity\PraticaAnalisi;
 use App\Pratiche\Enum\VoceOrigine;
@@ -37,6 +38,8 @@ class LavoriAi
         private readonly ConnettoreAiRepository $connettori,
         private readonly PraticheService $pratiche,
         private readonly MessageBusInterface $bus,
+        private readonly LavoriIndice $indice,
+        private readonly LavoriClassificazione $classificazioni,
         #[Autowire('%app.connettore_ai.modelli_verificati%')]
         private readonly array $modelliVerificati,
         #[Autowire('%app.connettore_ai.sperimentali_ammessi%')]
@@ -86,8 +89,39 @@ class LavoriAi
         $presi = $this->em->wrapInTransaction(fn () => $this->lavori->prendi($c, $limite, $ora));
         $out = [];
         foreach ($presi as $l) {
-            $p = $l->getPratica();
             $d = $l->getDocumento();
+            if (\in_array($l->getTipo(), LavoriClassificazione::TIPI, true)) {
+                // Una catena di domande: qui il prossimo passo (null: finita senza bisogno del Mac).
+                $lavoro = $this->classificazioni->richiesta($l);
+                if (null === $lavoro) {
+                    continue;
+                }
+                $out[] = [
+                    'id' => (string) $l->getId(),
+                    'tipo' => $l->getTipo(),
+                    'pratica' => LavoroAi::CLASSIFICAZIONE === $l->getTipo() ? 'Classificazione' : 'Proposta di categoria',
+                    'documento' => $d->getTitolo(),
+                    'scadeIl' => $l->getScadeIl()?->format(\DATE_ATOM),
+                ] + $lavoro;
+                continue;
+            }
+            if (LavoroAi::INDICE_DATI === $l->getTipo()) {
+                // Dati dell'indice: il testo del documento, entro i caratteri del server.
+                $lavoro = $this->indice->richiesta($l);
+                if (null === $lavoro) {
+                    $this->em->remove($l);
+                    continue;
+                }
+                $out[] = [
+                    'id' => (string) $l->getId(),
+                    'tipo' => $l->getTipo(),
+                    'pratica' => 'Analisi del testo',
+                    'documento' => $d->getTitolo(),
+                    'scadeIl' => $l->getScadeIl()?->format(\DATE_ATOM),
+                ] + $lavoro;
+                continue;
+            }
+            $p = $l->praticaDelLavoro();
             if (!$this->pratiche->daAnalizzare($p, $d) || ($d->isCifrato() && !$p->haConsensoCifratiDispositivi())) {
                 // Non più da fare qui (pratica chiusa, già analizzato, consenso revocato):
                 // se serve ancora, ci pensa il server.
@@ -137,14 +171,36 @@ class LavoriAi
         if (!\is_string($dati['risposta'] ?? null) || \strlen($dati['risposta']) > 60000) {
             throw new DatiNonValidi('Risposta del modello mancante o troppo lunga.');
         }
-        $p = $l->getPratica();
+        $durata = \is_int($dati['durataMs'] ?? null) && $dati['durataMs'] > 0 ? $dati['durataMs'] : null;
+        if (\in_array($l->getTipo(), LavoriClassificazione::TIPI, true)) {
+            $usata = $this->classificazioni->risultato($l, $c, $dati['risposta'], $modello);
+            if ($usata) {
+                $c->lavoroFatto($durata);
+            }
+            $this->em->flush();
+            if (!$usata) {
+                throw new Conflitto('La domanda è cambiata nel frattempo: il lavoro si rifà.');
+            }
+
+            return 1;
+        }
+        if (LavoroAi::INDICE_DATI === $l->getTipo()) {
+            $n = $this->indice->risultato($l, $c, $dati['risposta'], $modello);
+            $this->em->remove($l);
+            if (null !== $n) {
+                $c->lavoroFatto($durata);
+            }
+            $this->em->flush();
+
+            return $n ?? throw new Conflitto('Questo documento non è più da analizzare.');
+        }
+        $p = $l->praticaDelLavoro();
         $d = $l->getDocumento();
         if (!$this->pratiche->daAnalizzare($p, $d)) {
             $this->em->remove($l);
             $this->em->flush();
             throw new Conflitto('Questo documento non è più da analizzare (o è già stato analizzato).');
         }
-        $durata = \is_int($dati['durataMs'] ?? null) && $dati['durataMs'] > 0 ? $dati['durataMs'] : null;
         $n = $this->pratiche->risultatoDispositivo($p, $d, $dati['risposta'], VoceOrigine::AI_CONNETTORE, self::metodo($modello), [
             'modello' => $modello,
             'durataMs' => $durata,
@@ -173,7 +229,8 @@ class LavoriAi
 
     /**
      * Attività pianificata: lease scaduti rimessi in attesa; lavori fermi da
-     * troppo (nessun Mac online) o falliti due volte rimandati al server.
+     * troppo (nessun Mac online) o falliti due volte rimandati al server;
+     * proposte di categoria mai ritirate dal wizard cancellate dopo un'ora.
      *
      * @return array{rimessi: int, alServer: int}
      */
@@ -197,6 +254,7 @@ class LavoriAi
                 ++$alServer;
             }
         }
+        $this->classificazioni->pulisci($ora);
         $this->em->flush();
 
         return ['rimessi' => $rimessi, 'alServer' => $alServer];
@@ -233,8 +291,20 @@ class LavoriAi
 
     private function rimandaAlServer(LavoroAi $l): void
     {
-        $p = (string) $l->getPratica()->getId();
+        if (\in_array($l->getTipo(), LavoriClassificazione::TIPI, true)) {
+            $this->classificazioni->rimandaAlServer($l);
+
+            return;
+        }
         $d = (string) $l->getDocumento()->getId();
+        if (LavoroAi::INDICE_DATI === $l->getTipo()) {
+            // I vettori ci sono già: la VM rifà solo i dati.
+            $this->em->remove($l);
+            $this->bus->dispatch(new IndicizzaDocumentoMessage($d, forzaServer: true, soloDati: true));
+
+            return;
+        }
+        $p = (string) $l->praticaDelLavoro()->getId();
         $this->em->remove($l);
         $this->bus->dispatch(new AnalizzaDocumentoPraticaMessage($p, $d, forzaServer: true));
     }

@@ -85,6 +85,36 @@ abstract class ApiTestCase extends WebTestCase
         return static::getContainer()->get(RoleRepository::class)->getSystemRole($slug);
     }
 
+    /**
+     * Un Mac collegato alla famiglia di $tenantId e online (ha appena fatto PUT /me),
+     * approvato da chi ha $token: il token di accesso del connettore.
+     */
+    protected function macOnline(string $tenantId, string $token, string $modello = 'qwen3:4b-instruct-2507-q4_K_M'): string
+    {
+        $d = $this->request('POST', '/api/ai-connector-plugin/oauth/device', ['client_id' => 'cartellaviva-mac', 'nome' => 'MacBook di prova']);
+        $this->request('POST', "/api/tenants/{$tenantId}/connettori-ai/approva", ['userCode' => $d['user_code'], 'password' => self::PASSWORD], $token);
+        $t = $this->request('POST', '/api/ai-connector-plugin/oauth/token', ['client_id' => 'cartellaviva-mac', 'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code', 'device_code' => $d['device_code']]);
+        $this->request('PUT', '/api/ai-connector-plugin/me', ['motore' => 'ollama', 'modello' => $modello], $t['access_token']);
+        self::assertResponseIsSuccessful();
+
+        return $t['access_token'];
+    }
+
+    /**
+     * Il prossimo lavoro che il Mac riceve, o null. Svuota la cache prima: il server
+     * vuole al massimo una richiesta ogni 5 secondi, nei test se ne fanno di più.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function lavoroDelMac(string $access): ?array
+    {
+        static::getContainer()->get('cache.app')->clear();
+        $r = $this->request('GET', '/api/ai-connector-plugin/lavori?limite=1&caratteri=12000', token: $access);
+        self::assertResponseIsSuccessful();
+
+        return $r['lavori'][0] ?? null;
+    }
+
     protected function login(User $user): string
     {
         $response = $this->request('POST', '/api/auth/login', ['email' => $user->getEmail(), 'password' => self::PASSWORD]);

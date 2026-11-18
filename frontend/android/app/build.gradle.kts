@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -25,11 +27,34 @@ android {
         versionName = flutter.versionName
     }
 
+    // La chiave per firmare le versioni da distribuire: android/key.properties
+    // (storeFile, storePassword, keyAlias, keyPassword), fuori dal repository
+    // come la chiave stessa. Senza, si firma con la chiave di sviluppo.
+    val chiave = Properties()
+    val fileChiave = rootProject.file("key.properties")
+    if (fileChiave.exists()) {
+        fileChiave.inputStream().use { chiave.load(it) }
+    }
+
+    signingConfigs {
+        if (fileChiave.exists()) {
+            create("distribuzione") {
+                storeFile = file(chiave.getProperty("storeFile"))
+                storePassword = chiave.getProperty("storePassword")
+                keyAlias = chiave.getProperty("keyAlias")
+                keyPassword = chiave.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (fileChiave.exists()) {
+                signingConfigs.getByName("distribuzione")
+            } else {
+                logger.warn("android/key.properties mancante: la release è firmata con la chiave di sviluppo.")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

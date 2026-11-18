@@ -82,6 +82,8 @@ Per ogni file:
 
 Se `OLLAMA_MODEL` è vuota la classificazione è disattivata e i documenti restano da categorizzare.
 
+Con il Mac della famiglia collegato e acceso, la classificazione e la proposta di categoria del wizard le fa il Mac ([connettore-ai.md](connettore-ai.md), "Classificazione").
+
 Su una VM senza GPU servono circa 3–4 GB di RAM e da qualche secondo a qualche decina di secondi per documento.
 
 **Limite**: i documenti rimasti cifrati non sono ricercabili per testo OCR (la ricerca lavora solo sul testo in chiaro).

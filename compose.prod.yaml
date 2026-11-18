@@ -115,11 +115,15 @@ services:
       # Contesto fisso: il testo inviato (fino a ~6.000 caratteri) più la risposta ci stanno.
       OLLAMA_CONTEXT_LENGTH: "8192"
       OLLAMA_NUM_PARALLEL: "1"
+      # Un modello alla volta: qwen3 4B con il suo contesto (~3,8 GB) e bge-m3 (~1,2 GB)
+      # insieme superano i 5 GB e il kernel chiude il modello a ogni analisi del testo.
+      # Così Ollama scarica l'uno prima di caricare l'altro (qualche secondo in più).
+      OLLAMA_MAX_LOADED_MODELS: "1"
     volumes:
       - ollama_models:/root/.ollama
-    # Tetto di memoria, senza swap: con molte analisi di fila il motore cresce fino a
-    # riempire la VM. Oltre i 5 GB il kernel chiude solo il modello (Ollama lo ricarica
-    # alla richiesta dopo): quel documento finisce in errore e "Cerca di nuovo" lo riprova.
+    # Tetto di memoria, senza swap: tiene il motore lontano da database e PHP. Oltre i
+    # 5 GB il kernel chiude solo il modello (Ollama lo ricarica alla richiesta dopo):
+    # quel documento finisce in errore e "Cerca di nuovo" lo riprova.
     mem_limit: 5g
     memswap_limit: 5g
     restart: unless-stopped

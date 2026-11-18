@@ -233,6 +233,57 @@ final class ImportJobTest extends ApiTestCase
         self::assertCount(1, $this->auditRows('documento.classificato', 'success'));
     }
 
+    public function testWithTheMacOnlineTheImportIsClassifiedOnTheMac(): void
+    {
+        $access = $this->macOnline((string) $this->tenant->getId(), $this->login($this->owner));
+        $this->drive()->folder('radice', 'Documenti')->file('fattura', 'scan001.png', 'image/png', 'radice', $this->fixture('ocr_fattura.png'));
+        $this->runJob($this->source(ImportStrategia::AI_CONTENUTO));
+        $this->ocr($this->documentsByFileId()['fattura']);
+        static::getContainer()->get(ClassificaDocumentoHandler::class)($this->sent(ClassificaDocumentoMessage::class)[0]);
+        self::assertSame([], $this->classifier()->calls, 'con il Mac online il server non chiama il suo modello');
+
+        $l = $this->lavoroDelMac($access);
+        self::assertSame(['classificazione', 'Classificazione'], [$l['tipo'], $l['pratica']]);
+        self::assertStringContainsString('FATTURA', $l['prompt'], 'il documento importato è cifrato: il testo si decifra solo per il Mac');
+        self::assertContains('Bollette', json_decode($l['schema'], true)['properties']['categoria']['enum']);
+        $r = $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/risultato", ['risposta' => '{"categoria":"Bollette"}', 'modello' => 'qwen3:4b-instruct-2507-q4_K_M'], $access);
+        $this->assertStatus(200);
+        self::assertSame(['voci' => 1], $r);
+
+        $doc = $this->documentsByFileId()['fattura'];
+        self::assertSame('Bollette', $doc->getCategoria()->getNome());
+        self::assertTrue($doc->isCifrato(), 'la cifratura non si toglie in automatico, nemmeno dal Mac');
+        $audit = $this->auditRows('documento.classificato', 'success');
+        self::assertCount(1, $audit);
+        self::assertSame('qwen3:4b-instruct-2507-q4_K_M', json_decode((string) $audit[0]['context'], true)['modello']);
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM lavoro_ai'));
+        self::assertNull($this->lavoroDelMac($access));
+    }
+
+    public function testTwoErrorsOnTheMacSendTheImportBackToTheServer(): void
+    {
+        $access = $this->macOnline((string) $this->tenant->getId(), $this->login($this->owner));
+        $this->drive()->folder('radice', 'Documenti')->file('fattura', 'scan001.png', 'image/png', 'radice', $this->fixture('ocr_fattura.png'));
+        $this->runJob($this->source(ImportStrategia::AI_CONTENUTO));
+        $this->ocr($this->documentsByFileId()['fattura']);
+        static::getContainer()->get(ClassificaDocumentoHandler::class)($this->sent(ClassificaDocumentoMessage::class)[0]);
+        $this->transport()->reset();
+        foreach (['timeout', 'memoria'] as $codice) {
+            $l = $this->lavoroDelMac($access);
+            $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/errore", ['codice' => $codice], $access);
+            $this->assertStatus(200);
+        }
+        $rimandati = $this->sent(ClassificaDocumentoMessage::class);
+        self::assertCount(1, $rimandati);
+        self::assertTrue($rimandati[0]->forzaServer);
+
+        // Il server la fa anche con il Mac ancora online.
+        $this->classifier()->risposta = 'Bollette';
+        static::getContainer()->get(ClassificaDocumentoHandler::class)($rimandati[0]);
+        self::assertCount(1, $this->classifier()->calls);
+        self::assertSame('Bollette', $this->documentsByFileId()['fattura']->getCategoria()->getNome());
+    }
+
     public function testLowConfidenceAnswerLeavesDocumentWhereItIs(): void
     {
         $this->drive()->folder('radice', 'Documenti')->file('fattura', 'scan001.png', 'image/png', 'radice', $this->fixture('ocr_fattura.png'));
@@ -345,6 +396,11 @@ final class ImportJobTest extends ApiTestCase
         $transport = static::getContainer()->get('messenger.transport.async');
 
         return array_values(array_map(static fn ($e) => $e->getMessage(), array_filter($transport->getSent(), static fn ($e) => $e->getMessage() instanceof $class)));
+    }
+
+    private function transport(): InMemoryTransport
+    {
+        return static::getContainer()->get('messenger.transport.async');
     }
 
     private function drive(): FakeGoogleDrive

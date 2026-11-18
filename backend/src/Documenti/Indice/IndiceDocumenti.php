@@ -45,27 +45,54 @@ class IndiceDocumenti
      */
     public function salva(Documento $documento, DatiEstratti $dati, ?string $modelloDati, ?string $modelloEmbedding, array $vettori): void
     {
-        if ($documento->isCifrato()) {
-            throw new \LogicException('Un documento cifrato non si indicizza.');
-        }
-        $id = $documento->getId()->toRfc4122();
-        $tenant = $documento->getTenant()->getId()->toRfc4122();
-        $json = static fn (array $v) => json_encode($v, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        $this->salvaDati($documento, $dati, $modelloDati);
+        $this->salvaVettori($documento, $modelloEmbedding, $vettori);
+    }
 
+    /**
+     * Solo dati estratti, tag e riferimenti: i vettori restano. Serve quando i dati
+     * arrivano dopo, dal connettore sul Mac. Stesse condizioni di salva().
+     */
+    public function salvaDati(Documento $documento, DatiEstratti $dati, ?string $modelloDati): void
+    {
+        $this->nonCifrato($documento);
+        $json = static fn (array $v) => json_encode($v, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
         $this->db->executeStatement(<<<'SQL'
-            INSERT INTO documento_indice (documento_id, tenant_id, dati, tag, riferimenti, modello_dati, modello_embedding, aggiornato_il)
-            VALUES (:id, :tenant, CAST(:dati AS JSONB), CAST(:tag AS JSONB), CAST(:rif AS JSONB), :md, :me, :ora)
+            INSERT INTO documento_indice (documento_id, tenant_id, dati, tag, riferimenti, modello_dati, aggiornato_il)
+            VALUES (:id, :tenant, CAST(:dati AS JSONB), CAST(:tag AS JSONB), CAST(:rif AS JSONB), :md, :ora)
             ON CONFLICT (documento_id) DO UPDATE SET
                 dati = EXCLUDED.dati, tag = EXCLUDED.tag, riferimenti = EXCLUDED.riferimenti,
-                modello_dati = EXCLUDED.modello_dati, modello_embedding = EXCLUDED.modello_embedding,
-                aggiornato_il = EXCLUDED.aggiornato_il
+                modello_dati = EXCLUDED.modello_dati, aggiornato_il = EXCLUDED.aggiornato_il
             SQL, [
-            'id' => $id,
-            'tenant' => $tenant,
+            'id' => $documento->getId()->toRfc4122(),
+            'tenant' => $documento->getTenant()->getId()->toRfc4122(),
             'dati' => $json($dati->dati()),
             'tag' => $json($dati->tag),
             'rif' => $json($dati->riferimenti),
             'md' => $modelloDati,
+            'ora' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Solo i vettori per la ricerca: dati, tag e riferimenti già salvati restano.
+     * Stesse condizioni di salva().
+     *
+     * @param list<list<float>> $vettori una riga per parte del testo
+     */
+    public function salvaVettori(Documento $documento, ?string $modelloEmbedding, array $vettori): void
+    {
+        $this->nonCifrato($documento);
+        $id = $documento->getId()->toRfc4122();
+        $tenant = $documento->getTenant()->getId()->toRfc4122();
+        $this->db->executeStatement(<<<'SQL'
+            INSERT INTO documento_indice (documento_id, tenant_id, modello_embedding, aggiornato_il)
+            VALUES (:id, :tenant, :me, :ora)
+            ON CONFLICT (documento_id) DO UPDATE SET
+                modello_embedding = EXCLUDED.modello_embedding, aggiornato_il = EXCLUDED.aggiornato_il
+            SQL, [
+            'id' => $id,
+            'tenant' => $tenant,
             'me' => [] === $vettori ? null : $modelloEmbedding,
             'ora' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
@@ -76,6 +103,13 @@ class IndiceDocumenti
                 'INSERT INTO documento_embedding (documento_id, parte, tenant_id, modello, embedding) VALUES (:id, :parte, :tenant, :modello, CAST(:v AS vector))',
                 ['id' => $id, 'parte' => $parte, 'tenant' => $tenant, 'modello' => (string) $modelloEmbedding, 'v' => self::vettore($vettore)],
             );
+        }
+    }
+
+    private function nonCifrato(Documento $documento): void
+    {
+        if ($documento->isCifrato()) {
+            throw new \LogicException('Un documento cifrato non si indicizza.');
         }
     }
 

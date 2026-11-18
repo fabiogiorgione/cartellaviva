@@ -2,6 +2,7 @@
 
 namespace App\Documenti\Controller;
 
+use App\ConnettoreAi\LavoriClassificazione;
 use App\Documenti\Classificazione\PropostaCategoria;
 use App\Documenti\Classificazione\TurnoOccupato;
 use App\Documenti\Classificazione\TurnoProposte;
@@ -36,6 +37,12 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * utente, poche insieme sulla piattaforma (TurnoProposte) e un limite orario per utente.
  * Se non c'è posto risponde 429 con Retry-After di pochi secondi (il wizard riprova);
  * oltre il limite orario, 429 con il tempo che manca.
+ *
+ * Con il Mac della famiglia online la proposta la fa il Mac (LavoriClassificazione):
+ * la prima richiesta la avvia e risponde 429 con Retry-After breve, come per un turno
+ * occupato; il wizard ripete la stessa richiesta finché arriva l'esito. Se il Mac non
+ * ce la fa, la richiesta successiva la fa il server. Il limite orario si conta una
+ * volta per proposta, non a ogni richiesta ripetuta.
  */
 #[IsGranted('IS_AUTHENTICATED_FULLY')]
 final class PropostaCategoriaController extends AbstractController
@@ -45,6 +52,8 @@ final class PropostaCategoriaController extends AbstractController
     private const MAX_NUOVE = 30;
     private const MAX_ESCLUDI = 50;
     private const RIPROVA_TRA = 5;
+    private const RIPROVA_SUL_MAC = 4;
+    private const SUL_MAC = 'Il Mac della famiglia sta analizzando il documento.';
 
     public function __construct(
         private readonly TenantAccess $access,
@@ -54,6 +63,7 @@ final class PropostaCategoriaController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly TurnoProposte $turni,
         private readonly RateLimiterFactoryInterface $propostaCategoriaLimiter,
+        private readonly LavoriClassificazione $sulMac,
     ) {
     }
 
@@ -80,19 +90,31 @@ final class PropostaCategoriaController extends AbstractController
             throw new UnprocessableEntityHttpException(sprintf('escludi: al massimo %d documenti.', self::MAX_ESCLUDI));
         }
 
+        $nuove = array_values(array_filter($nuove, 'is_string'));
+        $escludi = array_values(array_filter($escludi, 'is_string'));
         $utente = $this->access->currentUser()->getId()->toRfc4122();
-        $limite = $this->propostaCategoriaLimiter->create($utente)->consume();
-        if (!$limite->isAccepted()) {
-            throw new TooManyRequestsHttpException(max(1, $limite->getRetryAfter()->getTimestamp() - time()), 'Troppe proposte nell\'ultima ora: riprova più tardi.');
+        $stato = $this->sulMac->proposta($documento);
+        if (\is_array($stato)) {
+            return $this->json($stato['esito']);
+        }
+        if ('in_corso' === $stato) {
+            throw new TooManyRequestsHttpException(self::RIPROVA_SUL_MAC, self::SUL_MAC);
+        }
+        if (null === $stato) {
+            $limite = $this->propostaCategoriaLimiter->create($utente)->consume();
+            if (!$limite->isAccepted()) {
+                throw new TooManyRequestsHttpException(max(1, $limite->getRetryAfter()->getTimestamp() - time()), 'Troppe proposte nell\'ultima ora: riprova più tardi.');
+            }
+            if ($this->sulMac->avviaProposta($documento, $nuove, $escludi)) {
+                throw new TooManyRequestsHttpException(self::RIPROVA_SUL_MAC, self::SUL_MAC);
+            }
         }
 
         // Il modello locale su CPU può metterci decine di secondi, fino a tre richieste: in FrankenPHP
         // max_execution_time conta anche le attese, e i 30 secondi predefiniti non bastano.
         set_time_limit(700);
         try {
-            return $this->json($this->turni->esegui($utente, fn () => $this->proposta->proponi(
-                $documento, array_values(array_filter($nuove, 'is_string')), array_values(array_filter($escludi, 'is_string')),
-            )));
+            return $this->json($this->turni->esegui($utente, fn () => $this->proposta->proponi($documento, $nuove, $escludi)));
         } catch (TurnoOccupato $e) {
             // Retry-After breve: il wizard aspetta e riprova lo stesso documento.
             throw new TooManyRequestsHttpException(self::RIPROVA_TRA, $e->getMessage(), $e);

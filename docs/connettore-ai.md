@@ -17,15 +17,17 @@ Un'app per macOS che esegue sul Mac della famiglia, con Ollama o con il modello 
 
 Prima versione:
 
-- solo l'analisi dei documenti per le **pratiche** (`AnalizzaDocumentoPraticaMessage`), per le pratiche con `analisiSu = server`;
+- l'analisi dei documenti per le **pratiche** (`AnalizzaDocumentoPraticaMessage`), per le pratiche con `analisiSu = server`;
+- dal 18/11/2026 anche i **dati dell'indice** dei documenti in chiaro (`IndicizzaDocumentoMessage`: emittente, data, importo, numero, intestatario, riferimenti, tag; vedi "Analisi del testo" più sotto);
+- dal 18/11/2026 anche la **classificazione automatica** dei documenti importati (`ClassificaDocumentoMessage`) e la **proposta di categoria** del wizard (`POST …/proposta-categoria`), anche per i documenti cifrati (vedi "Classificazione" più sotto);
 - motore **Ollama** sul Mac;
 - un connettore attivo per famiglia (più connettori sono ammessi dal modello dati, ma la prima versione ne usa uno: il più recente online).
 
-Dopo (fase 4): modello Apple sul Mac, classificazione (`ClassificaDocumentoMessage`), scadenze (`ProponiScadenzaMessage`), pagamenti (`ProponiPagamentoMessage`), avviso immediato con Mercure.
+Dopo (fase 4): modello Apple sul Mac, scadenze (`ProponiScadenzaMessage`), pagamenti (`ProponiPagamentoMessage`), avviso immediato con Mercure.
 
 Fuori, per scelta:
 
-- **embedding**: restano sul server con `OLLAMA_EMBED_MODEL` (bge-m3). Un altro modello darebbe vettori incompatibili con l'indice pgvector;
+- **embedding**: restano sul server con `OLLAMA_EMBED_MODEL` (bge-m3). Un altro modello darebbe vettori incompatibili con l'indice pgvector; con lo stesso modello e lo stesso digest i vettori sarebbero compatibili, ma è da verificare prima di spostarli;
 - **OCR**: resta Tesseract sul server (Apple Vision sul Mac è un'idea per dopo, ma cambia il testo di riferimento su cui si ricontrollano i valori);
 - pratiche con `analisiSu = telefono`: restano dell'iPhone.
 
@@ -60,6 +62,30 @@ sequenceDiagram
 5. Il server ricontrolla le voci sul testo (`EstrattoreVoci::daGrezze`), toglie i doppioni (`DoppioniVoce`), le cifra (`PraticaCifratura`) e le salva come proposte con origine `ai_connettore`.
 6. Lease scaduto o connettore sparito: un'attività pianificata rimette il lavoro al server.
 
+### Analisi del testo (dati dell'indice)
+
+Dal 18/11/2026. Con il Mac della famiglia online, `IndicizzaDocumentoHandler` calcola sul server solo i vettori (bge-m3, leggero) e crea un `LavoroAi` di tipo `indice_dati` (`LavoriIndice::instrada`): il server non chiama qwen3. I dati già salvati restano finché arriva la risposta del Mac.
+
+- La richiesta è quella di sempre (`AiEstrattoreDati::richiesta`: stesse istruzioni, testo entro `app.classifier_max_chars`, schema con le date trovate nel testo); `pratica` nella risposta di `GET /lavori` vale "Analisi del testo".
+- La risposta del Mac passa da `AiEstrattoreDati::interpreta`, gli stessi controlli sul testo dell'Ollama del server: un emittente, un importo o un codice che non compare nel testo si scarta. Si salvano solo i dati (`IndiceDocumenti::salvaDati`), i vettori restano; la data del documento si mette solo se manca. `risultato` risponde `{"voci": n}` con il numero di dati validi.
+- Solo documenti in chiaro: un documento diventato cifrato nel frattempo non arriva al Mac (il lavoro si cancella all'assegnazione) e la risposta non si salva.
+- Errori, lease scaduti e Mac sparito come per le pratiche; il ritorno al server è `IndicizzaDocumentoMessage` con `forzaServer` e `soloDati`: la VM rifà solo i dati.
+- Nell'audit `documento.indicizzato` con il modello e l'id del connettore, mai i dati.
+
+Misura del 18/11/2026 su una bolletta inventata: 10 secondi sul MacBook Air M3 con qwen3 4B, circa 3 minuti sulla VM.
+
+### Classificazione
+
+Dal 18/11/2026. La classificazione automatica degli import e la proposta di categoria del wizard sono catene di domande al modello: la scelta tra le categorie, poi (solo nel wizard) la descrizione della categoria, la verifica sì/no e, se nessuna va bene, una categoria nuova. Le regole restano in `ClassificazioneAutomatica` e `PropostaCategoria`; le domande e l'interpretazione delle risposte in `AiCategoryClassifier` (`richiesta…` e `interpreta…`).
+
+- Con il Mac online la catena gira con `ClassificatoreSulMac` (`LavoriClassificazione`): ogni volta si rifà dall'inizio, le domande già fatte hanno il loro risultato, la prima senza risposta è il passo del lavoro e va al Mac. Arrivata la risposta, la catena riparte: finisce, o il lavoro torna in attesa con la domanda dopo (senza contare un tentativo). Una domanda si riconosce dall'impronta SHA-256 di istruzioni, prompt e schema: se intanto cambiano il documento o gli esempi delle categorie, la risposta vecchia riceve `409` e la domanda si rifà.
+- In `lavoro_ai.dati` restano solo i risultati interpretati (la categoria scelta, il sì/no, la descrizione della categoria, la proposta finale), mai testo, prompt o risposte grezze. La riga si cancella alla fine.
+- **Documenti cifrati**: vanno al Mac anche loro (decisione del 18/11/2026: il Mac è della famiglia). Il testo si decifra in memoria a ogni passo; l'audit, come sul server, non dice la proposta di un cifrato.
+- **Wizard**: la prima richiesta avvia la proposta sul Mac e risponde `429` con `Retry-After: 4` e "Il Mac della famiglia sta analizzando il documento."; il wizard già aspetta e ripete la stessa richiesta (nessuna modifica alle app), che a proposta finita riceve l'esito una volta sola. Il limite orario si conta una volta per proposta. Se il Mac sbaglia due volte, o non è più online mentre il lavoro aspetta, la richiesta successiva la fa il server. Le proposte mai ritirate (wizard chiuso) si cancellano dopo un'ora.
+- **Import**: il gestore crea il lavoro e non chiama Ollama; il Mac sposta il documento con le stesse regole (la cifratura non si toglie mai in automatico). Il ritorno al server è `ClassificaDocumentoMessage` con `forzaServer`.
+
+Misura del 18/11/2026 sul MacBook Air M3 con qwen3 4B, su una fattura veterinaria inventata: circa 4 secondi per domanda; la catena (scelta, descrizione, verifica, categoria nuova) ha scartato "Casa" e proposto "Veterinario".
+
 ## Modello dati
 
 Nuovo modulo `backend/src/ConnettoreAi/` (Entity, Repository, Controller, Security, Message, MessageHandler).
@@ -93,15 +119,16 @@ Nuovo modulo `backend/src/ConnettoreAi/` (Entity, Repository, Controller, Securi
 | `scade_il` | timestamp | 10 minuti |
 | `ultimo_poll_il` | timestamp | per `slow_down` |
 
-**`lavoro_ai`**: la coda dei lavori per i connettori. Non contiene testo né prompt: si costruiscono al momento dell'assegnazione e vivono solo in memoria.
+**`lavoro_ai`**: la coda dei lavori per i connettori. Non contiene testo né prompt: si costruiscono al momento dell'assegnazione e vivono solo in memoria. Per le classificazioni `dati` tiene lo stato della catena (vedi "Classificazione").
 
 | Colonna | Tipo | Note |
 | --- | --- | --- |
 | `id` | uuid | |
 | `tenant_id` | uuid, FK | |
-| `tipo` | varchar(20) | `pratica_voci` (poi `classificazione`, `scadenza`, `pagamento`) |
-| `pratica_id`, `documento_id` | uuid, FK | `ON DELETE CASCADE`; unico (`tipo`, `pratica_id`, `documento_id`) |
-| `stato` | varchar(10) | `in_attesa`, `assegnato` |
+| `tipo` | varchar(20) | `pratica_voci`, `indice_dati`, `classificazione`, `proposta_categoria` (poi `scadenza`, `pagamento`) |
+| `pratica_id`, `documento_id` | uuid, FK | `ON DELETE CASCADE`; unico (`tipo`, `pratica_id`, `documento_id`); `pratica_id` solo per `pratica_voci`, e senza pratica un lavoro per tipo e documento (`uniq_lavoro_ai_documento`) |
+| `stato` | varchar(10) | `in_attesa`, `assegnato`; per le proposte anche `pronto` (esito da ritirare) e `al_server` |
+| `dati` | json, null | stato della catena di classificazione: parametri del wizard, risultati interpretati, passo in corso, esito |
 | `connettore_id` | uuid, null | chi lo ha preso |
 | `assegnato_il`, `scade_il` | timestamp, null | lease |
 | `tentativi` | smallint | |
