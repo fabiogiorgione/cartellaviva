@@ -1,0 +1,13 @@
+{% extends 'emails/_layout.html.twig' %}
+{% import 'emails/_componenti.html.twig' as cv %}
+
+{% block contenuto %}
+<p>Ciao,</p>
+<p>questo è il codice per rispondere alla richiesta di <strong>{{ ente }}</strong>:</p>
+{{ cv.codice(codice) }}
+<p>Vale 10 minuti. Inseriscilo nella pagina della richiesta che hai aperto dal link.</p>
+{% endblock %}
+
+{% block nota %}Non comunicare il codice a nessuno: nemmeno l'ente o il supporto te lo chiederanno mai. Se non stai rispondendo a nessuna richiesta, ignora questa email.{% endblock %}
+
+{% block perche %}Ricevi questa email perché {{ ente }} ha indicato questo indirizzo su CartellaViva.{% endblock %}

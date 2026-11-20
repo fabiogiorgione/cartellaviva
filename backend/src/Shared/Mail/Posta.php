@@ -18,17 +18,29 @@ final class Posta
         private readonly MailerInterface $mailer,
         #[Autowire('%app.mailer_from%')]
         private readonly string $mittente,
+        #[Autowire('%app.frontend_url%')]
+        private readonly string $frontendUrl,
     ) {
     }
 
-    /** @param array<string, mixed> $contesto */
+    /**
+     * Il template estende emails/_layout.html.twig, che riceve anche l'oggetto
+     * (il titolo di base dell'email) e l'indirizzo dell'app per il piè di pagina.
+     *
+     * @param array<string, mixed> $contesto
+     */
     public function invia(string $a, string $oggetto, string $template, array $contesto = []): void
     {
+        $app = rtrim($this->frontendUrl, '/');
         $this->mailer->send((new TemplatedEmail())
             ->from(new Address($this->mittente, 'CartellaViva'))
             ->to($a)
             ->subject($oggetto)
             ->htmlTemplate($template)
-            ->context($contesto));
+            ->context($contesto + [
+                'oggetto' => $oggetto,
+                'app_url' => $app,
+                'app_host' => parse_url($app, \PHP_URL_HOST) ?: $app,
+            ]));
     }
 }

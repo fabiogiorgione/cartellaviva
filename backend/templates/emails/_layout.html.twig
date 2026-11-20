@@ -1,0 +1,89 @@
+{#
+    Layout comune delle email di CartellaViva: fascia verde con il logo, testo in un
+    riquadro bianco su fondo verde chiaro, piè di pagina centrato (docs/email.md).
+
+    Ogni email estende questo file e riempie:
+    - contenuto: il testo (paragrafi <p>, componenti da _componenti.html.twig);
+    - nota (facoltativo): la riga in piccolo in fondo al riquadro;
+    - perche (facoltativo): perché si riceve l'email, se non per un account;
+    - titolo (facoltativo): di base è l'oggetto dell'email.
+
+    Tabelle e stili in linea perché Outlook e Gmail ignorano gran parte del CSS;
+    il blocco <style> aggiunge solo il tema scuro e il telefono, dove sono supportati.
+    Nessun carattere o immagine da internet: il logo è allegato all'email, il testo
+    usa Plus Jakarta Sans solo se è installato, altrimenti Helvetica o Arial.
+#}
+{% set layout_font = "'Plus Jakarta Sans', Helvetica, Arial, sans-serif" %}
+{% set layout_titolo = block('titolo') is defined ? block('titolo')|trim : oggetto|default('') %}
+{% set layout_nota = block('nota') is defined ? block('nota')|trim : '' %}
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{{ layout_titolo }}</title>
+<style>
+    :root { color-scheme: light dark; supported-color-schemes: light dark; }
+    .cv-scheda a { color: #0F5C4C; }
+    .cv-scheda a.cv-bottone { color: #FFFFFF; }
+    @media (max-width: 620px) {
+        .cv-esterno { padding: 16px 8px !important; }
+        .cv-pad { padding-left: 24px !important; padding-right: 24px !important; }
+    }
+    @media (prefers-color-scheme: dark) {
+        body, .cv-fondo { background: #0B1512 !important; }
+        .cv-scheda { background: #13241F !important; color: #E4EEE9 !important; }
+        .cv-scheda h1, .cv-codice { color: #FFFFFF !important; }
+        .cv-scheda a { color: #7FC8A9 !important; }
+        .cv-scheda a.cv-bottone { color: #FFFFFF !important; }
+        .cv-riquadro { background: #1C302A !important; color: #E4EEE9 !important; }
+        .cv-nota { color: #A9BDB5 !important; border-top-color: #2A3D37 !important; }
+        .cv-piede { color: #A9BDB5 !important; }
+        .cv-piede-nome { color: #FFFFFF !important; }
+        .cv-piede a { color: #7FC8A9 !important; }
+    }
+</style>
+</head>
+<body style="margin: 0; padding: 0; background: #EEF4F1;">
+<table role="presentation" class="cv-fondo" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #EEF4F1;">
+<tr>
+<td class="cv-esterno" align="center" style="padding: 32px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 600px;">
+<tr>
+<td class="cv-pad" style="background: #0F5C4C; border-radius: 12px 12px 0 0; padding: 20px 40px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="padding-right: 12px; vertical-align: middle;"><img src="{{ email.image('emails/immagini/logo-bianco.png') }}" width="40" height="33" alt="" style="display: block; border: 0;"></td>
+<td style="vertical-align: middle; font-family: {{ layout_font }}; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: #FFFFFF;">Cartella<span style="color: #CFE3DA;">Viva</span></td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td class="cv-scheda cv-pad" style="background: #FFFFFF; border-radius: 0 0 12px 12px; padding: 36px 40px 40px; font-family: {{ layout_font }}; font-size: 16px; line-height: 1.55; color: #13241F;">
+{% if layout_titolo %}<h1 style="margin: 0 0 20px; font-family: {{ layout_font }}; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; color: #13241F;">{{ layout_titolo }}</h1>{% endif %}
+{% block contenuto %}{% endblock %}
+{% if layout_nota %}<div class="cv-nota" style="margin-top: 24px; padding-top: 18px; border-top: 1px solid #DCE6E1; font-size: 13px; line-height: 1.5; color: #4A5A55;">{{ layout_nota|raw }}</div>{% endif %}
+</td>
+</tr>
+<tr>
+<td class="cv-piede cv-pad" align="center" style="padding: 28px 40px 8px; font-family: {{ layout_font }}; font-size: 13px; line-height: 1.5; color: #4A5A55; text-align: center;">
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="padding-right: 8px; vertical-align: middle;"><img src="{{ email.image('emails/immagini/logo-colori.png') }}" width="22" height="18" alt="" style="display: block; border: 0;"></td>
+<td class="cv-piede-nome" style="vertical-align: middle; font-family: {{ layout_font }}; font-size: 14px; font-weight: 800; color: #13241F;">CartellaViva</td>
+</tr>
+</table>
+<p style="margin: 10px 0 0;">I documenti di famiglia, al sicuro e sempre aggiornati.</p>
+<p style="margin: 10px 0 0;">{% block perche %}Ricevi questa email perché hai un account su CartellaViva.{% endblock %}<br>Nessuno di CartellaViva ti chiederà mai la password o i codici.</p>
+<p style="margin: 10px 0 0;"><a href="{{ app_url }}" style="color: #0F5C4C; font-weight: 700; text-decoration: none;">{{ app_host }}</a></p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

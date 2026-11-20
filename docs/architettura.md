@@ -42,7 +42,7 @@ Convenzioni:
   Con il debug spento (produzione) il messaggio arriva lo stesso a chi usa l'app, ma solo
   per gli errori 4xx creati in `src/` (`MessaggioErroreNormalizer`): quelli creati da
   Symfony e tutti i 5xx restano generici ("Not Found", "Internal Server Error").
-- **Helper comuni**: `Shared\Mail\Posta` (email), `Shared\TokenCasuale` (link e
+- **Helper comuni**: `Shared\Mail\Posta` (email, layout comune: [email.md](email.md)), `Shared\TokenCasuale` (link e
   sessioni), `Shared\Http\RispostaFile` (download e anteprime), `Shared\Doctrine\PerId`
   (caricamento per id), `Shared\Doctrine\ElaborazioneIsolata` (job che lavorano
   un'entità alla volta).

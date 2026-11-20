@@ -65,7 +65,7 @@ final class LinkRispostaService
         $codice = str_pad((string) random_int(0, 999999), 6, '0', \STR_PAD_LEFT);
         $d->nuovoOtp($this->hashOtp($d, $codice));
         $this->em->flush();
-        $this->posta->invia((string) $d->getReferenteLink()?->getEmail(), 'Il tuo codice per rispondere su CartellaViva', 'emails/ente_codice.html.twig', ['ente' => $d->getRichiesta()->getTenant()->getName(), 'codice' => $codice]);
+        $this->posta->invia((string) $d->getReferenteLink()?->getEmail(), 'Il tuo codice per rispondere su CartellaViva', 'emails/richiesta_codice.html.twig', ['ente' => $d->getRichiesta()->getTenant()->getName(), 'codice' => $codice]);
     }
 
     /** Codice corretto: restituisce il token di sessione (2 ore). */

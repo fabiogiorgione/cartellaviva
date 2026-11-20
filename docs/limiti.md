@@ -9,7 +9,7 @@ Questa guida fa parte del manuale tecnico; la presentazione del progetto è nel 
   - l'app Android in release è firmata con la chiave di debug (`frontend/android/app/build.gradle.kts`): per distribuirla serve la propria chiave;
   - l'app per Mac (`connettore-mac/`) è firmata ad hoc: per distribuirla fuori dal proprio Mac servono un Developer ID e la notarizzazione Apple; mancano anche aggiornamenti automatici, icona e installer.
 - **Test**:
-  - backend: 328 test al 18/11/2026 (frontend 129, connettore Mac 14); alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
+  - backend: 354 test al 20/11/2026 (frontend 129, connettore Mac 14); alla versione 0.1.0 erano 240 e coprivano l'84% delle righe di `backend/src`;
   - frontend (misura alla 0.1.0): 110 test, che toccano 89 file su 185 di `frontend/lib` e, di quelli, il 34% delle righe. Le parti meno coperte sono l'account (13%) e il layout (9%).
 - **Analisi statica**: PHPStan è al livello 5, con 51 segnalazioni ancora in `backend/phpstan-baseline.neon`. L'analizzatore di Flutter dà 8 avvisi informativi.
 - **Dipendenze**:

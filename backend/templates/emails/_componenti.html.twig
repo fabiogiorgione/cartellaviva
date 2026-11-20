@@ -1,0 +1,25 @@
+{#
+    Componenti delle email (docs/email.md). Uso, dentro il blocco contenuto:
+        {% import 'emails/_componenti.html.twig' as cv %}
+        {{ cv.bottone(url, 'Apri CartellaViva') }}
+#}
+
+{# Il pulsante principale. pericolo = rosso, per le azioni che fermano qualcosa ("Mi oppongo"). #}
+{% macro bottone(url, testo, pericolo = false) %}
+{% set colore = pericolo ? '#B42318' : '#0F5C4C' %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 24px 0;">
+<tr>
+<td style="background: {{ colore }}; border-radius: 8px;"><a class="cv-bottone" href="{{ url }}" style="display: inline-block; padding: 14px 24px; font-family: 'Plus Jakarta Sans', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 700; line-height: 1.2; color: #FFFFFF; text-decoration: none; border-radius: 8px;">{{ testo }}</a></td>
+</tr>
+</table>
+{% endmacro %}
+
+{# Un codice da digitare, grande e spaziato (solo il codice dentro il tag). #}
+{% macro codice(codice) %}
+<p class="cv-codice" style="margin: 20px 0; font-size: 32px; font-weight: 800; letter-spacing: 8px; line-height: 1.2; color: #13241F;">{{ codice }}</p>
+{% endmacro %}
+
+{# Un testo citato (la nota di chi ha deciso) in un riquadro. pericolo = rosato. #}
+{% macro riquadro(testo, pericolo = false) %}
+<p class="cv-riquadro" style="margin: 16px 0; padding: 14px 16px; background: {{ pericolo ? '#FDECEA' : '#F1F6F3' }}; border-radius: 8px; color: #13241F;">{{ testo }}</p>
+{% endmacro %}
