@@ -13,8 +13,6 @@ use App\Ente\RisposteService;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Contracts\Cache\CacheInterface;
-use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * Proposta di categoria per un documento (wizard "Proponi categoria con l'AI").
@@ -24,9 +22,10 @@ use Symfony\Contracts\Cache\ItemInterface;
  * 1. Tra le categorie esistenti (con qualche titolo di esempio per ognuna) e le
  *    categorie nuove già proposte in questo giro ($nuove), così documenti simili
  *    finiscono nella stessa categoria nuova.
- * 2. Verifica sì/no della scelta contro una descrizione della categoria (in cache):
- *    un modello piccolo forza spesso il documento nella categoria "meno lontana"
- *    (un volo in "Veicoli").
+ * 2. Verifica sì/no della scelta contro una descrizione della categoria: un modello
+ *    piccolo forza spesso il documento nella categoria "meno lontana" (un volo in
+ *    "Veicoli"). La descrizione: DescrizioneCategoria (scritta a mano per le
+ *    categorie di sistema, dal modello per le altre).
  * 3. Se nessuna va bene, e c'è il testo, il nome di una categoria nuova.
  *
  * Come la classificazione degli import, il testo di un documento cifrato si
@@ -48,7 +47,7 @@ final class PropostaCategoria
         private readonly IndiceDocumenti $indice,
         private readonly DocumentAudit $audit,
         private readonly Connection $db,
-        private readonly CacheInterface $cache,
+        private readonly DescrizioneCategoria $descrizioni,
     ) {
     }
 
@@ -107,7 +106,7 @@ final class PropostaCategoria
             $modello = $result->modello;
             $scelta = null === $result->categoria ? null : mb_strtolower($result->categoria);
             // Il modello sceglie quasi sempre qualcosa: una domanda sì/no scarta le scelte forzate.
-            if (null !== $scelta && !$classifier->verifica($documento->getNomeFileOriginale(), $testo, (string) $result->categoria, $this->descrizione($classifier, $result->modello, (string) $result->categoria, $esempi[(string) $result->categoria] ?? []), $indizi)) {
+            if (null !== $scelta && !$classifier->verifica($documento->getNomeFileOriginale(), $testo, (string) $result->categoria, $this->descrizioni->per($classifier, $result->modello, $perNome[$scelta] ?? null, (string) $result->categoria, $esempi[(string) $result->categoria] ?? []), $indizi)) {
                 $scelta = null;
             }
             if (null !== $scelta && isset($perNome[$scelta])) {
@@ -132,23 +131,6 @@ final class PropostaCategoria
             + ($documento->isCifrato() || 'nessuna' === $esito['tipo'] ? [] : ['proposta' => $esito['nome'] ?? null]));
 
         return $esito;
-    }
-
-    /**
-     * Descrizione della categoria per la verifica: una chiamata al modello, poi in
-     * cache finché non cambiano modello, nome o esempi (vale per tutto il wizard).
-     *
-     * @param list<string> $esempi
-     */
-    private function descrizione(ClassifierInterface $classifier, string $modello, string $categoria, array $esempi): string
-    {
-        $chiave = 'categoria_descrizione_'.hash('xxh128', json_encode([$modello, $categoria, $esempi], \JSON_THROW_ON_ERROR));
-
-        return $this->cache->get($chiave, function (ItemInterface $item) use ($classifier, $categoria, $esempi): string {
-            $item->expiresAfter(7 * 86400);
-
-            return $classifier->descriviCategoria($categoria, $esempi);
-        });
     }
 
     /** @return list<string> */

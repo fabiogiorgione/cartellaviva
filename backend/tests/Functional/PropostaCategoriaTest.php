@@ -50,7 +50,10 @@ final class PropostaCategoriaTest extends ApiTestCase
         self::assertArrayNotHasKey('Casa', $call['esempi']);
         self::assertNotContains('Da categorizzare', $call['categorie'], 'le categorie di servizio non si propongono');
         self::assertNotContains('Condivisi con enti', $call['categorie']);
-        self::assertSame([['categoria' => 'Bollette', 'descrizione' => 'documenti di tipo Bollette']], $this->classifier()->callsVerifica, 'la scelta si verifica contro la descrizione della categoria');
+        self::assertCount(1, $this->classifier()->callsVerifica, 'la scelta si verifica contro la descrizione della categoria');
+        self::assertSame('Bollette', $this->classifier()->callsVerifica[0]['categoria']);
+        self::assertStringStartsWith('bollette, fatture e solleciti di luce', $this->classifier()->callsVerifica[0]['descrizione'], 'di sistema: la descrizione scritta a mano');
+        self::assertSame([], $this->classifier()->callsDescrizione, 'nessuna domanda al modello per descriverla');
         self::assertSame([], $this->classifier()->callsNuova, 'trovata una categoria: niente categoria nuova');
 
         $dettaglio = $this->request('GET', "/api/tenants/{$this->tid()}/documenti/{$doc['id']}", token: $this->token);
@@ -85,6 +88,19 @@ final class PropostaCategoriaTest extends ApiTestCase
 
         self::assertSame(['tipo' => 'nuova', 'nome' => 'Viaggi', 'sensibile' => false, 'icona' => 'plane', 'fonte' => 'testo'], $this->proponi($doc['id']));
         self::assertSame('Veicoli', $this->classifier()->callsVerifica[0]['categoria']);
+    }
+
+    public function testAFamilyCategoryIsDescribedByTheModel(): void
+    {
+        $sport = (array) $this->request('POST', "/api/tenants/{$this->tid()}/categorie", ['nome' => 'Sport', 'icona' => 'trophy', 'colore' => '#10b981'], $this->token);
+        $this->assertStatus(201);
+        $this->upload($this->tid(), $this->token, 'Iscrizione corso di nuoto', 'nuoto.txt', ['titolo' => 'Corso nuoto Sara', 'categoriaId' => $sport['id']]);
+        $doc = $this->carica('scansione 3', 'casa', 'Palestra Esempio: abbonamento annuale');
+        $this->classifier()->risposta = 'Sport';
+
+        self::assertSame(['tipo' => 'esistente', 'categoriaId' => $sport['id'], 'nome' => 'Sport', 'fonte' => 'testo'], $this->proponi($doc['id']));
+        self::assertSame([['categoria' => 'Sport', 'esempi' => ['Corso nuoto Sara']]], $this->classifier()->callsDescrizione);
+        self::assertSame([['categoria' => 'Sport', 'descrizione' => 'documenti di tipo Sport']], $this->classifier()->callsVerifica);
     }
 
     public function testNoProposalWhenTheModelCannotTell(): void
@@ -187,7 +203,9 @@ final class PropostaCategoriaTest extends ApiTestCase
     public function testWithTheMacOnlineTheProposalIsMadeOnTheMacStepByStep(): void
     {
         $access = $this->macOnline($this->tid(), $this->token);
-        $this->carica('Bolletta luce marzo', 'bollette', 'Luce Demo, fattura luce');
+        $utenze = (array) $this->request('POST', "/api/tenants/{$this->tid()}/categorie", ['nome' => 'Utenze', 'icona' => 'zap', 'colore' => '#f59e0b'], $this->token);
+        $this->assertStatus(201);
+        $this->upload($this->tid(), $this->token, 'Luce Demo, fattura luce', 'luce.txt', ['titolo' => 'Bolletta luce marzo', 'categoriaId' => $utenze['id']]);
         $doc = $this->carica('scansione 12', 'casa', 'Luce Demo: bolletta della luce, totale 87,40 euro');
 
         // La prima richiesta avvia la proposta sul Mac: il wizard aspetta e ripete, come per un turno occupato.
@@ -199,14 +217,14 @@ final class PropostaCategoriaTest extends ApiTestCase
         $l = $this->lavoroDelMac($access);
         self::assertSame(['proposta_categoria', 'Proposta di categoria', 'scansione 12'], [$l['tipo'], $l['pratica'], $l['documento']]);
         self::assertStringContainsString('totale 87,40 euro', $l['prompt']);
-        self::assertStringContainsString('- Bollette (vi si trovano già, ad esempio: "Bolletta luce marzo")', $l['prompt']);
-        self::assertContains('Bollette', json_decode($l['schema'], true)['properties']['categoria']['enum']);
-        $this->rispondi($access, $l, ['categoria' => 'Bollette']);
+        self::assertStringContainsString('- Utenze (vi si trovano già, ad esempio: "Bolletta luce marzo")', $l['prompt']);
+        self::assertContains('Utenze', json_decode($l['schema'], true)['properties']['categoria']['enum']);
+        $this->rispondi($access, $l, ['categoria' => 'Utenze']);
         $this->assertSulMac($doc['id']);
 
-        // 2. La descrizione della categoria, poi 3. la verifica sì/no contro la descrizione.
+        // 2. La descrizione della categoria (della famiglia: la scrive il modello), poi 3. la verifica sì/no.
         $l = $this->lavoroDelMac($access);
-        self::assertStringContainsString('Categoria: Bollette', $l['prompt']);
+        self::assertStringContainsString('Categoria: Utenze', $l['prompt']);
         $this->rispondi($access, $l, ['descrizione' => 'bollette di luce, gas e acqua']);
         $l = $this->lavoroDelMac($access);
         self::assertStringContainsString('Raccoglie: bollette di luce, gas e acqua', $l['prompt']);
@@ -214,12 +232,12 @@ final class PropostaCategoriaTest extends ApiTestCase
         self::assertNull($this->lavoroDelMac($access), 'catena finita: niente altro per il Mac');
 
         // La richiesta dopo ha l'esito, una volta sola; il server non ha chiamato il suo modello.
-        self::assertSame(['tipo' => 'esistente', 'categoriaId' => (string) $this->categoria('bollette')->getId(), 'nome' => 'Bollette', 'fonte' => 'testo'], $this->proponi($doc['id']));
+        self::assertSame(['tipo' => 'esistente', 'categoriaId' => $utenze['id'], 'nome' => 'Utenze', 'fonte' => 'testo'], $this->proponi($doc['id']));
         self::assertSame([[], [], [], []], [$this->classifier()->calls, $this->classifier()->callsDescrizione, $this->classifier()->callsVerifica, $this->classifier()->callsNuova]);
         self::assertSame(0, $this->lavori());
         $audit = $this->auditRows('documento.categoria_proposta');
         $contesto = json_decode((string) end($audit)['context'], true);
-        self::assertSame(['esito' => 'esistente', 'modello' => 'qwen3:4b-instruct-2507-q4_K_M', 'proposta' => 'Bollette'], array_intersect_key($contesto, ['esito' => 1, 'modello' => 1, 'proposta' => 1]));
+        self::assertSame(['esito' => 'esistente', 'modello' => 'qwen3:4b-instruct-2507-q4_K_M', 'proposta' => 'Utenze'], array_intersect_key($contesto, ['esito' => 1, 'modello' => 1, 'proposta' => 1]));
     }
 
     public function testARejectedChoiceOnTheMacEndsWithANewCategoryAndEncryptedDocumentsGoToo(): void
@@ -232,13 +250,14 @@ final class PropostaCategoriaTest extends ApiTestCase
         self::assertStringContainsString('vaccinazione del cane Fido', $l['prompt'], 'anche un cifrato va al Mac, decifrato in memoria');
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne("SELECT COUNT(*) FROM lavoro_ai WHERE dati::text LIKE '%Fido%'"));
         $this->rispondi($access, $l, ['categoria' => 'Casa']);
-        $this->rispondi($access, $this->lavoroDelMac($access), ['descrizione' => 'documenti della casa']);
-        $this->rispondi($access, $this->lavoroDelMac($access), ['argomento' => 'vaccino del cane', 'giusta' => false]);
-        // Dopo tre passi, nel lavoro solo risultati interpretati: né testo né risposte del modello.
+        // Casa è di sistema: la verifica subito, con la descrizione scritta a mano.
+        $l = $this->lavoroDelMac($access);
+        self::assertStringContainsString('Raccoglie: rogito, mutuo', $l['prompt']);
+        $this->rispondi($access, $l, ['argomento' => 'vaccino del cane', 'giusta' => false]);
+        // Dopo due passi, nel lavoro solo risultati interpretati: né testo né risposte del modello.
         $dati = (string) $this->em()->getConnection()->fetchOne('SELECT dati::text FROM lavoro_ai');
         self::assertStringNotContainsString('Fido', $dati);
         self::assertStringNotContainsString('vaccino', $dati);
-        self::assertStringContainsString('documenti della casa', $dati);
         $l = $this->lavoroDelMac($access);
         self::assertStringContainsString('proponi UNA nuova categoria', $l['istruzioni']);
         $this->rispondi($access, $l, ['nome' => 'veterinario', 'sensibile' => false, 'simbolo' => 'paw-print']);

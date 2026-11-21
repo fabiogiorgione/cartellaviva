@@ -70,9 +70,10 @@ Per ogni file:
    - i nomi delle categorie del tenant.
 
    La risposta è vincolata da uno schema JSON (`enum` = categorie + "nessuna") e poi ricontrollata contro l'elenco reale.
-4. Il risultato:
-   - **categoria valida**: il documento viene spostato. Se era cifrato **resta cifrato** anche se la nuova categoria non è sensibile: la decifratura non avviene mai in automatico;
-   - **"nessuna" o qualsiasi altra risposta**: il documento resta in "Da categorizzare". L'audit registra `documento.classificazione_incerta`.
+4. **Verifica sì/no** (dal 21/11/2026): una seconda domanda confronta il documento con la descrizione della categoria scelta (`DescrizioneCategoria`, la stessa del wizard: scritta a mano per le categorie di sistema, generata dai titoli della categoria per quelle della famiglia). Senza verifica il modello sceglie quasi sempre una categoria, anche forzata: su 87 casi inventati (misura del 21/11/2026 con qwen3 4B) i documenti spostati nella categoria sbagliata scendono da 27 a 3, i giusti salgono dal 69% al 92%. Costa una domanda in più per documento.
+5. Il risultato:
+   - **categoria valida e confermata**: il documento viene spostato. Se era cifrato **resta cifrato** anche se la nuova categoria non è sensibile: la decifratura non avviene mai in automatico;
+   - **"nessuna", qualsiasi altra risposta o scelta scartata dalla verifica**: il documento resta in "Da categorizzare". L'audit registra `documento.classificazione_incerta` (con `motivo: verifica` se l'ha scartata la verifica).
 
 **Il modello** si imposta **solo** con `OLLAMA_MODEL`. Quello consigliato è `qwen3:4b-instruct-2507-q4_K_M`:
 - ufficiale;
@@ -98,7 +99,7 @@ Nella lista dei documenti, **Sui selezionati › Proponi categoria con l'AI…**
 
 Come lavora `PropostaCategoria`, con lo stesso modello locale della classificazione automatica:
 - **Scelta**: il modello sceglie tra le categorie della famiglia, escluse "Da categorizzare" e "Condivisi con enti", e tra le categorie nuove già proposte nello stesso giro, così documenti simili finiscono insieme. Per ogni categoria riceve fino a 3 titoli di esempio, esclusi i documenti in revisione e i titoli che sono solo nomi di file (`DOC_1660607446`, `scan 12`).
-- **Verifica sì/no**: un modello da 4B mette quasi sempre il documento in qualche categoria, anche forzata (un volo in "Veicoli"). Una seconda domanda confronta il documento con una descrizione della categoria generata a parte, che resta in cache una settimana.
+- **Verifica sì/no**: un modello da 4B mette quasi sempre il documento in qualche categoria, anche forzata (un volo in "Veicoli"). Una seconda domanda confronta il documento con una descrizione della categoria. Per le categorie di sistema è scritta a mano (`descrizione` in `config/packages/categorie.yaml`, dal 21/11/2026); per quelle della famiglia e per le nuove la genera il modello a parte e resta in cache una settimana. Quelle generate dimenticavano generi interi (un rogito scartato da "Casa"): sugli stessi 87 casi inventati le descrizioni scritte a mano portano il wizard dall'86% al 91% dei casi giusti.
 - **Categoria nuova**: se la scelta non passa la verifica, il modello propone il nome di una categoria nuova (1-4 parole, controllato da `NuovaCategoria::normalizzaNome`) con icona e sensibilità. Se il testo non è disponibile, per esempio OCR non ancora fatto o ZIP, decide solo dal titolo e non propone categorie nuove.
 - **Documenti cifrati**: il testo è decifrato solo in memoria e va solo a Ollama locale. Nell'audit non finisce nulla di ricavato dal contenuto.
 

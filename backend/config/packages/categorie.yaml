@@ -6,15 +6,26 @@
 # vengono cifrati lato applicazione. Cambiare questo valore NON riscrive i
 # documenti già caricati.
 # icona: nome di un'icona Lucide (https://lucide.dev), colore: #RRGGBB.
+# descrizione: che cosa raccoglie la categoria, per la verifica sì/no della proposta di
+# categoria (PropostaCategoria). Scritta a mano: quella generata dal modello piccolo
+# dimenticava generi interi (un rogito scartato da "Casa"). Misura del 21/11/2026 su
+# 87 casi inventati con qwen3 4B: wizard dall'86% al 91% dei casi giusti.
 parameters:
     app.categorie_sistema:
-        bollette:           { nome: Bollette,             icona: receipt,       colore: '#f59e0b', sensibile: false }
-        documenti_identita: { nome: Documenti Identità,   icona: id-card,       colore: '#6366f1', sensibile: true }
-        salute:             { nome: Salute,               icona: heart-pulse,   colore: '#ef4444', sensibile: true }
-        farmaci:            { nome: Farmaci,              icona: pill,          colore: '#ec4899', sensibile: true }
-        veicoli:            { nome: Veicoli,              icona: car,           colore: '#0ea5e9', sensibile: false }
-        casa:               { nome: Casa,                 icona: house,         colore: '#22c55e', sensibile: false }
-        scuola:             { nome: Scuola,               icona: graduation-cap, colore: '#a855f7', sensibile: false }
+        bollette:           { nome: Bollette,             icona: receipt,       colore: '#f59e0b', sensibile: false,
+                            descrizione: "bollette, fatture e solleciti di luce, gas, acqua, telefono, internet e TARI; contratti e attivazioni delle forniture" }
+        documenti_identita: { nome: Documenti Identità,   icona: id-card,       colore: '#6366f1', sensibile: true,
+                            descrizione: "carta d'identità, passaporto, patente, tessera sanitaria, codice fiscale, permesso di soggiorno, certificati anagrafici (residenza, stato di famiglia, nascita)" }
+        salute:             { nome: Salute,               icona: heart-pulse,   colore: '#ef4444', sensibile: true,
+                            descrizione: "referti, esami, visite, ricoveri e dimissioni, vaccinazioni, certificati medici, fatture di medici e dentisti, prenotazioni di visite delle persone della famiglia" }
+        farmaci:            { nome: Farmaci,              icona: pill,          colore: '#ec4899', sensibile: true,
+                            descrizione: "ricette, piani terapeutici, scontrini della farmacia, fogli illustrativi e documenti sui medicinali delle persone della famiglia" }
+        veicoli:            { nome: Veicoli,              icona: car,           colore: '#0ea5e9', sensibile: false,
+                            descrizione: "libretto, assicurazione, bollo, revisione, tagliandi e riparazioni, multe stradali e documenti di auto e moto della famiglia" }
+        casa:               { nome: Casa,                 icona: house,         colore: '#22c55e', sensibile: false,
+                            descrizione: "rogito, mutuo, contratto d'affitto, condominio, assicurazione e certificati dell'abitazione, lavori e riparazioni, garanzie degli elettrodomestici, IMU" }
+        scuola:             { nome: Scuola,               icona: graduation-cap, colore: '#a855f7', sensibile: false,
+                            descrizione: "pagelle, iscrizioni, circolari, mensa, gite, libri, assicurazione scolastica, titoli di studio e università" }
         # Documenti importati (Google Drive) in attesa di classificazione. Sensibile per
         # prudenza: finché il contenuto non è noto il documento si cifra. Se poi viene
         # classificato in una categoria non sensibile resta comunque cifrato.

@@ -14,7 +14,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 final class CategorieSynchronizer
 {
     /**
-     * @param array<string, array{nome: string, icona: string, colore: string, sensibile: bool}> $definitions
+     * @param array<string, array{nome: string, icona: string, colore: string, sensibile: bool, descrizione?: string}> $definitions
      */
     public function __construct(
         private readonly CategoriaRepository $categorie,

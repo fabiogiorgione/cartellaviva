@@ -226,6 +226,9 @@ final class ImportJobTest extends ApiTestCase
         self::assertStringContainsString('FATTURA', $call['testo']);
         self::assertContains('Bollette', $call['categorie']);
         self::assertNotContains('Da categorizzare', $call['categorie']);
+        self::assertCount(1, $this->classifier()->callsVerifica, 'prima di spostare, la verifica sì/no');
+        self::assertStringStartsWith('bollette, fatture e solleciti di luce', $this->classifier()->callsVerifica[0]['descrizione']);
+        self::assertSame([], $this->classifier()->callsDescrizione, 'categoria di sistema: la descrizione scritta a mano');
 
         $doc = $this->documentsByFileId()['fattura'];
         self::assertSame('Bollette', $doc->getCategoria()->getNome());
@@ -249,6 +252,13 @@ final class ImportJobTest extends ApiTestCase
         $r = $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/risultato", ['risposta' => '{"categoria":"Bollette"}', 'modello' => 'qwen3:4b-instruct-2507-q4_K_M'], $access);
         $this->assertStatus(200);
         self::assertSame(['voci' => 1], $r);
+        self::assertTrue($this->documentsByFileId()['fattura']->getCategoria()->isDaCategorizzare(), 'prima la verifica');
+
+        // 2. La verifica sì/no, con la descrizione scritta a mano della categoria di sistema.
+        $l = $this->lavoroDelMac($access);
+        self::assertStringContainsString('Raccoglie: bollette, fatture e solleciti', $l['prompt']);
+        $this->request('POST', "/api/ai-connector-plugin/lavori/{$l['id']}/risultato", ['risposta' => '{"argomento":"fattura","giusta":true}', 'modello' => 'qwen3:4b-instruct-2507-q4_K_M'], $access);
+        $this->assertStatus(200);
 
         $doc = $this->documentsByFileId()['fattura'];
         self::assertSame('Bollette', $doc->getCategoria()->getNome());
@@ -282,6 +292,44 @@ final class ImportJobTest extends ApiTestCase
         static::getContainer()->get(ClassificaDocumentoHandler::class)($rimandati[0]);
         self::assertCount(1, $this->classifier()->calls);
         self::assertSame('Bollette', $this->documentsByFileId()['fattura']->getCategoria()->getNome());
+    }
+
+    public function testAChoiceRejectedByTheCheckLeavesDocumentWhereItIs(): void
+    {
+        $this->drive()->folder('radice', 'Documenti')->file('fattura', 'scan001.png', 'image/png', 'radice', $this->fixture('ocr_fattura.png'));
+        $this->runJob($this->source(ImportStrategia::AI_CONTENUTO));
+
+        $this->classifier()->risposta = 'Veicoli';
+        $this->classifier()->verificata = false;
+        $this->ocr($this->documentsByFileId()['fattura']);
+        static::getContainer()->get(ClassificaDocumentoHandler::class)($this->sent(ClassificaDocumentoMessage::class)[0]);
+
+        self::assertTrue($this->documentsByFileId()['fattura']->getCategoria()->isDaCategorizzare(), 'una scelta forzata non sposta il documento');
+        self::assertSame('Veicoli', $this->classifier()->callsVerifica[0]['categoria']);
+        $audit = $this->auditRows('documento.classificazione_incerta', 'success');
+        self::assertCount(1, $audit);
+        self::assertSame('verifica', json_decode((string) $audit[0]['context'], true)['motivo']);
+        self::assertCount(0, $this->auditRows('documento.classificato', 'success'));
+    }
+
+    public function testAFamilyCategoryIsDescribedFromItsOwnTitles(): void
+    {
+        $token = $this->login($this->owner);
+        $tid = (string) $this->tenant->getId();
+        $utenze = (array) $this->request('POST', "/api/tenants/$tid/categorie", ['nome' => 'Utenze', 'icona' => 'zap', 'colore' => '#f59e0b'], $token);
+        $this->assertStatus(201);
+        $this->upload($tid, $token, 'Gas Esempio, fattura', 'gas.txt', ['titolo' => 'Fattura gas inverno', 'categoriaId' => $utenze['id']]);
+        $this->upload($tid, $token, 'scansione', 'scan.txt', ['titolo' => 'DOC_1660607446', 'categoriaId' => $utenze['id']]);
+        $this->drive()->folder('radice', 'Documenti')->file('fattura', 'scan001.png', 'image/png', 'radice', $this->fixture('ocr_fattura.png'));
+        $this->runJob($this->source(ImportStrategia::AI_CONTENUTO));
+
+        $this->classifier()->risposta = 'Utenze';
+        $this->ocr($this->documentsByFileId()['fattura']);
+        static::getContainer()->get(ClassificaDocumentoHandler::class)($this->sent(ClassificaDocumentoMessage::class)[0]);
+
+        self::assertSame([['categoria' => 'Utenze', 'esempi' => ['Fattura gas inverno']]], $this->classifier()->callsDescrizione, 'i titoli della categoria, senza i nomi di file');
+        self::assertSame([['categoria' => 'Utenze', 'descrizione' => 'documenti di tipo Utenze']], $this->classifier()->callsVerifica);
+        self::assertSame('Utenze', $this->documentsByFileId()['fattura']->getCategoria()->getNome());
     }
 
     public function testLowConfidenceAnswerLeavesDocumentWhereItIs(): void

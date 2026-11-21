@@ -20,8 +20,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Classificazione dei documenti sul Mac della famiglia (docs/connettore-ai.md):
  * la classificazione automatica degli import e la proposta di categoria del wizard.
  *
- * Sono catene di domande al modello (scelta, descrizione della categoria,
- * verifica, categoria nuova) con le regole di ClassificazioneAutomatica e
+ * Sono catene di domande al modello (scelta, descrizione della categoria se non
+ * è di sistema, verifica, categoria nuova) con le regole di ClassificazioneAutomatica e
  * PropostaCategoria. Ogni volta la catena si rifà da capo con
  * ClassificatoreSulMac: le domande già fatte hanno il loro risultato, la prima
  * senza risposta va al Mac come passo del lavoro. Arrivata la risposta si
